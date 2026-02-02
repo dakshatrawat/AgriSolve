@@ -440,6 +440,59 @@ export default function NewUIChat() {
                       {msg.timestamp}
                     </p>
                   )}
+
+                  {/* Sources Display */}
+                  {msg.sender === "bot" &&
+                    msg.sources &&
+                    msg.sources.length > 0 && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() =>
+                            setShowSources((prev) => ({
+                              ...prev,
+                              [idx]: !prev[idx],
+                            }))
+                          }
+                          className="text-xs font-medium text-green-700 hover:text-green-800 transition-colors flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">
+                            {showSources[idx] ? "expand_less" : "expand_more"}
+                          </span>
+                          {showSources[idx] ? "Hide" : "View"} Sources (
+                          {msg.sources.length})
+                        </button>
+
+                        {showSources[idx] && (
+                          <div className="mt-2 space-y-2">
+                            {msg.sources.map((source, sourceIdx) => (
+                              <div
+                                key={sourceIdx}
+                                className="p-3 bg-green-50 border-l-4 border-green-500 rounded text-xs text-slate-700"
+                              >
+                                {source.doc_name && (
+                                  <p className="font-semibold text-green-800 mb-1">
+                                    📄 {source.doc_name}
+                                  </p>
+                                )}
+                                <p className="line-clamp-3 text-slate-600 italic">
+                                  "{source.text}"
+                                </p>
+                                {source.doc_url && (
+                                  <a
+                                    href={source.doc_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-green-700 hover:text-green-800 underline mt-1 inline-block"
+                                  >
+                                    View Document →
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
               </div>
             ))}
