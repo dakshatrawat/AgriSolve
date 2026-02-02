@@ -427,7 +427,7 @@ export default function NewUIChat() {
                       {msg.text}
                     </p>
                   ) : (
-                    <div className="prose prose-sm max-w-none prose-headings:text-slate-900 prose-p:text-slate-700 prose-a:text-green-700 prose-strong:text-green-700 prose-ul:text-slate-700 prose-ol:text-slate-700 prose-li:my-0.5">
+                    <div className="prose prose-sm max-w-none prose-headings:text-slate-900 prose-p:text-slate-800 prose-a:text-green-700 prose-strong:text-green-700 prose-ul:text-slate-800 prose-ol:text-slate-800 prose-li:my-0.5 text-slate-800">
                       <ReactMarkdown>{msg.text || "..."}</ReactMarkdown>
                     </div>
                   )}
