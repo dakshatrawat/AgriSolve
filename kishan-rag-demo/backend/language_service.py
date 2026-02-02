@@ -32,6 +32,55 @@ LANGUAGE_MAP = {
     "marathi": "Marathi"
 }
 
+# Model fallback list (in order of preference)
+MODEL_FALLBACK_LIST = [
+    "gemini-2.0-flash-exp",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+]
+
+
+def get_model_with_fallback(prompt: str, stream: bool = False):
+    """
+    Try to generate content with fallback models when quota is exhausted.
+    
+    Args:
+        prompt: The prompt to send to the model
+        stream: Whether to stream the response
+    
+    Returns:
+        Response from the first available model
+        
+    Raises:
+        Exception: If all models fail
+    """
+    last_error = None
+    
+    for model_name in MODEL_FALLBACK_LIST:
+        try:
+            print(f"[language_service] Trying model: {model_name}")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt, stream=stream)
+            print(f"[language_service] Successfully used model: {model_name}")
+            return response
+        except Exception as e:
+            error_msg = str(e)
+            print(f"[language_service] Model {model_name} failed: {error_msg}")
+            last_error = e
+            
+            # Check if it's a quota error, if so try next model
+            if "quota" in error_msg.lower() or "resource_exhausted" in error_msg.lower() or "429" in error_msg:
+                print(f"[language_service] Quota exhausted for {model_name}, trying next model...")
+                continue
+            else:
+                # If it's not a quota error, might be worth trying next model anyway
+                print(f"[language_service] Error with {model_name}, trying next model...")
+                continue
+    
+    # If all models failed, raise the last error
+    raise Exception(f"All models failed. Last error: {last_error}")
+
 
 def get_language_name(language_code: str) -> Optional[str]:
     """
@@ -83,8 +132,6 @@ async def normalize_to_english(text: str, source_language: str) -> str:
             print(f"[language_service] Unknown source language: {source_language}")
             return text
         
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
         # Smart prompt that handles both native script and Hinglish
         prompt = (
             f"Convert the following {source_lang_name} text to clear, natural English. "
@@ -93,7 +140,7 @@ async def normalize_to_english(text: str, source_language: str) -> str:
             f"Only return the English text, nothing else:\n\n{text}"
         )
         
-        response = model.generate_content(prompt, stream=False)
+        response = get_model_with_fallback(prompt, stream=False)
         normalized = response.text.strip() if response.text else text
         
         print(f"[language_service] Normalized from {source_lang_name} to English: '{text[:50]}...' → '{normalized[:50]}...'")
@@ -134,8 +181,6 @@ async def translate_to_user_language(text: str, target_language: str) -> str:
             print(f"[language_service] Unknown target language: {target_language}")
             return text
         
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
         # Preserve markdown and formatting
         prompt = (
             f"Translate the following English text to {target_lang_name}. "
@@ -143,7 +188,7 @@ async def translate_to_user_language(text: str, target_language: str) -> str:
             f"Only return the translated text, nothing else:\n\n{text}"
         )
         
-        response = model.generate_content(prompt, stream=False)
+        response = get_model_with_fallback(prompt, stream=False)
         translated = response.text.strip() if response.text else text
         
         print(f"[language_service] Translated to {target_lang_name}: {len(translated)} chars")
