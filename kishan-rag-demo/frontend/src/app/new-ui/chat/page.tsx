@@ -398,11 +398,12 @@ export default function NewUIChat() {
 
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex gap-4 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}
-            >
+          <div className="max-w-5xl mx-auto space-y-8">
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex gap-4 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}
+              >
               <div
                 className={`size-10 rounded-xl flex items-center justify-center text-white shrink-0 mt-1 shadow-md ${
                   msg.sender === "user" ? "bg-slate-800" : "bg-green-700"
@@ -443,6 +444,7 @@ export default function NewUIChat() {
             </div>
           ))}
           <div ref={chatEndRef} />
+          </div>
         </div>
 
         {/* Input Area */}
