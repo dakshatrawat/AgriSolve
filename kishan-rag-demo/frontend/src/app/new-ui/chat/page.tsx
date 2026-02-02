@@ -449,9 +449,6 @@ export default function NewUIChat() {
         <div className="p-8 z-10">
           <div className="max-w-5xl mx-auto">
             <div className="bg-white border border-slate-200 rounded-3xl shadow-xl p-3 flex items-center gap-3">
-              <button className="p-3 text-slate-400 hover:text-green-700 hover:bg-green-50 rounded-full transition-all">
-                <span className="material-symbols-outlined">attach_file</span>
-              </button>
               <button
                 onClick={isRecording ? stopRecording : startRecording}
                 disabled={sending || isTranscribing}
