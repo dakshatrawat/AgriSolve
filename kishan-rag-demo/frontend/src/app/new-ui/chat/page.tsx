@@ -404,46 +404,46 @@ export default function NewUIChat() {
                 key={idx}
                 className={`flex gap-4 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}
               >
-              <div
-                className={`size-10 rounded-xl flex items-center justify-center text-white shrink-0 mt-1 shadow-md ${
-                  msg.sender === "user" ? "bg-slate-800" : "bg-green-700"
-                }`}
-              >
-                <span className="material-symbols-outlined">
-                  {msg.sender === "user" ? "person" : "smart_toy"}
-                </span>
-              </div>
-              <div
-                className={`space-y-1 max-w-3xl ${msg.sender === "user" ? "text-right" : ""}`}
-              >
                 <div
-                  className={`p-6 rounded-2xl ${
-                    msg.sender === "user"
-                      ? "bg-green-700 text-white rounded-tr-none shadow-md"
-                      : "bg-white border border-slate-200 rounded-tl-none shadow-sm"
+                  className={`size-10 rounded-xl flex items-center justify-center text-white shrink-0 mt-1 shadow-md ${
+                    msg.sender === "user" ? "bg-slate-800" : "bg-green-700"
                   }`}
                 >
-                  {msg.sender === "user" ? (
-                    <p className="leading-relaxed text-[15px] font-medium">
-                      {msg.text}
+                  <span className="material-symbols-outlined">
+                    {msg.sender === "user" ? "person" : "smart_toy"}
+                  </span>
+                </div>
+                <div
+                  className={`space-y-1 max-w-3xl ${msg.sender === "user" ? "text-right" : ""}`}
+                >
+                  <div
+                    className={`p-6 rounded-2xl ${
+                      msg.sender === "user"
+                        ? "bg-green-700 text-white rounded-tr-none shadow-md"
+                        : "bg-white border border-slate-200 rounded-tl-none shadow-sm"
+                    }`}
+                  >
+                    {msg.sender === "user" ? (
+                      <p className="leading-relaxed text-[15px] font-medium">
+                        {msg.text}
+                      </p>
+                    ) : (
+                      <div className="prose prose-sm max-w-none prose-headings:text-slate-900 prose-p:text-slate-800 prose-a:text-green-700 prose-strong:text-green-700 prose-ul:text-slate-800 prose-ol:text-slate-800 prose-li:my-0.5 text-slate-800">
+                        <ReactMarkdown>{msg.text || "..."}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                  {msg.timestamp && (
+                    <p
+                      className={`text-[11px] text-slate-400 ${msg.sender === "user" ? "mr-1" : "ml-1"}`}
+                    >
+                      {msg.timestamp}
                     </p>
-                  ) : (
-                    <div className="prose prose-sm max-w-none prose-headings:text-slate-900 prose-p:text-slate-800 prose-a:text-green-700 prose-strong:text-green-700 prose-ul:text-slate-800 prose-ol:text-slate-800 prose-li:my-0.5 text-slate-800">
-                      <ReactMarkdown>{msg.text || "..."}</ReactMarkdown>
-                    </div>
                   )}
                 </div>
-                {msg.timestamp && (
-                  <p
-                    className={`text-[11px] text-slate-400 ${msg.sender === "user" ? "mr-1" : "ml-1"}`}
-                  >
-                    {msg.timestamp}
-                  </p>
-                )}
               </div>
-            </div>
-          ))}
-          <div ref={chatEndRef} />
+            ))}
+            <div ref={chatEndRef} />
           </div>
         </div>
 
