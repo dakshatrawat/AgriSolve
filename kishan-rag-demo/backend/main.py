@@ -14,6 +14,7 @@ _project_root = os.path.dirname(_backend_dir)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 import flags
+from language_service import get_model_with_fallback
 
 # ============================================================================
 # VECTOR DATABASE INITIALIZATION (Based on flags)
@@ -143,11 +144,10 @@ async def translate_text(text: str, target_language: str) -> str:
             print(f"[main] No Google API key, skipping translation")
             return text
         
-        # Use Gemini for translation
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        # Use Gemini for translation with fallback
         translation_prompt = f"Translate the following English text to {target_lang_name}. Preserve markdown formatting, code blocks, and special characters. Only return the translated text, nothing else:\n\n{text}"
         
-        response = model.generate_content(translation_prompt, stream=False)
+        response = get_model_with_fallback(translation_prompt, stream=False)
         translated = response.text.strip() if response.text else text
         
         print(f"[main] Translated response to {target_lang_name} ({len(translated)} chars)")
@@ -315,15 +315,12 @@ async def chat_endpoint(request: ChatRequest):
                     yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
                 return StreamingResponse(fallback_stream(), media_type="text/plain")
 
-            # Use streaming like backendinitial - FAST and CRISP
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            
             # Check if translation is needed
             needs_translation = request.language and request.language.lower() not in ["en", "english", None]
             
             if needs_translation:
                 # For translation, we need to get full response first, then translate
-                response = model.generate_content(prompt, stream=False)
+                response = get_model_with_fallback(prompt, stream=False)
                 full_response = response.text if response.text else "[No response generated]"
                 translated_response = await translate_text(full_response, request.language)
                 
@@ -334,7 +331,7 @@ async def chat_endpoint(request: ChatRequest):
             else:
                 # No translation needed - use streaming for fast response (like backendinitial)
                 def stream_generator():
-                    response_stream = model.generate_content(prompt, stream=True)
+                    response_stream = get_model_with_fallback(prompt, stream=True)
                     for chunk in response_stream:
                         if chunk.text:
                             yield chunk.text
