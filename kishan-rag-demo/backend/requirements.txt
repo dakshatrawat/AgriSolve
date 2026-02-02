@@ -1,0 +1,21 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+chromadb
+pinecone
+langchain
+langchain-text-splitters
+sentence-transformers
+# pypdf
+pymupdf
+google-generativeai
+python-multipart
+# Audio transcription
+transformers
+torch
+accelerate  # Required for torch device_map
+numpy
+librosa
+soundfile
+resampy  # Required for librosa.resample()

@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.env
+venv/
+.env
+*.sqlite3
+*.db
+.DS_Store
+
+# FastAPI
+instance/
+
+# VSCode
+.vscode/
+
+# Next.js
+.next/
+node_modules/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Misc
+*.swp
+*.swo
+.idea/
+Assets/
+
+# Large/binary local tools & archives
+backend/ffmpeg-8.0.1-essentials_build/
+backend/ffmpeg.zip
+*.zip
+*.exe
+# ML Models (download locally using download_models.py)
+backend/models/
+backend/chroma_data/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+
+# ML Models (download locally using download_models.py)
+backend/models/
+backend/chroma_data/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
