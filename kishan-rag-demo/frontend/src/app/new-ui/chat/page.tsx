@@ -39,12 +39,16 @@ export default function NewUIChat() {
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [showSources, setShowSources] = useState<{ [key: number]: boolean }>({});
+  const [showSources, setShowSources] = useState<{ [key: number]: boolean }>(
+    {},
+  );
 
   // Audio state
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null,
+  );
 
   // Sidebar state
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
@@ -401,16 +405,16 @@ export default function NewUIChat() {
             >
               <div
                 className={`size-10 rounded-xl flex items-center justify-center text-white shrink-0 mt-1 shadow-md ${
-                  msg.sender === "user"
-                    ? "bg-slate-800"
-                    : "bg-green-700"
+                  msg.sender === "user" ? "bg-slate-800" : "bg-green-700"
                 }`}
               >
                 <span className="material-symbols-outlined">
                   {msg.sender === "user" ? "person" : "smart_toy"}
                 </span>
               </div>
-              <div className={`space-y-1 max-w-3xl ${msg.sender === "user" ? "text-right" : ""}`}>
+              <div
+                className={`space-y-1 max-w-3xl ${msg.sender === "user" ? "text-right" : ""}`}
+              >
                 <div
                   className={`p-6 rounded-2xl ${
                     msg.sender === "user"
@@ -429,7 +433,9 @@ export default function NewUIChat() {
                   )}
                 </div>
                 {msg.timestamp && (
-                  <p className={`text-[11px] text-slate-400 ${msg.sender === "user" ? "mr-1" : "ml-1"}`}>
+                  <p
+                    className={`text-[11px] text-slate-400 ${msg.sender === "user" ? "mr-1" : "ml-1"}`}
+                  >
                     {msg.timestamp}
                   </p>
                 )}
@@ -509,7 +515,13 @@ type Message = {
   sources?: Source[];
 };
 
-const MessageBubble = ({ message, isUser }: { message: Message; isUser: boolean }) => (
+const MessageBubble = ({
+  message,
+  isUser,
+}: {
+  message: Message;
+  isUser: boolean;
+}) => (
   <div
     className={`px-4 py-3 rounded-lg transition-all duration-200 ${
       isUser
