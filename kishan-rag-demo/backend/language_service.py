@@ -33,11 +33,17 @@ LANGUAGE_MAP = {
 }
 
 # Model fallback list (in order of preference)
+# Only text generation models suitable for RAG (Retrieval-Augmented Generation)
+# Models available in Google AI Studio
 MODEL_FALLBACK_LIST = [
-    "gemini-2.0-flash-exp",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
+    "gemini-2.5-flash",        # Primary: Fast text generation, optimized for RAG
+    "gemini-2.5-flash-lite",   # Lightweight fallback
+    "gemini-3-flash",          # Latest generation model
+    "gemma-3-27b",            # Large Gemma model for complex tasks
+    "gemma-3-12b",            # Medium Gemma model
+    "gemma-3-4b",             # Smaller Gemma model
+    "gemma-3-2b",             # Lightweight Gemma model
+    "gemma-3-1b",             # Smallest Gemma model
 ]
 
 

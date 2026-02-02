@@ -64,7 +64,7 @@ import google.generativeai as genai
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 # Import centralized language service
-from language_service import process_user_input, format_response_for_user
+from language_service import process_user_input, format_response_for_user, get_model_with_fallback
 
 app = FastAPI()
 
@@ -364,7 +364,7 @@ async def chat_endpoint(request: ChatRequest):
         sources = [m["metadata"] for m in matches]
         
         # ====================================================================
-        # MODE 1: PINECONE + GEMINI API (Fast, Streaming - like backendinitial)
+        # MODE 1: PINECONE + GEMINI API (Fast, Streaming - with fallback)
         # ====================================================================
         if flags.USE_PINECONE and flags.USE_GEMINI_API:
             if not GOOGLE_API_KEY:
@@ -373,35 +373,134 @@ async def chat_endpoint(request: ChatRequest):
                     yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
                 return StreamingResponse(fallback_stream(), media_type="text/plain")
 
-            # Use streaming like backendinitial - FAST and CRISP
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            
             # Step 3: Generate English response from LLM
             # Step 4: Translate response to user's language (ALWAYS, unless English)
             needs_translation = user_language and user_language.lower() not in ["en", "english", None]
             
-            if needs_translation:
-                # Get full response first, then translate to user's language
-                response = model.generate_content(prompt, stream=False)
-                english_response = response.text if response.text else "[No response generated]"
+            try:
+                # Try text generation models with fallback (gemini-2.5-flash -> gemini-2.5-flash-lite -> gemini-3-flash -> Gemma models)
+                if needs_translation:
+                    # Get full response first, then translate to user's language
+                    response = get_model_with_fallback(prompt, stream=False)
+                    english_response = response.text if response.text else "[No response generated]"
+                    
+                    # Translate to user's language
+                    translated_response = await format_response_for_user(english_response, user_language)
+                    
+                    def stream_generator():
+                        yield translated_response
+                        yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
+                    return StreamingResponse(stream_generator(), media_type="text/plain")
+                else:
+                    # English selected - stream directly
+                    def stream_generator():
+                        try:
+                            response_stream = get_model_with_fallback(prompt, stream=True)
+                            for chunk in response_stream:
+                                if hasattr(chunk, 'text') and chunk.text:
+                                    yield chunk.text
+                        except Exception as stream_error:
+                            # If streaming fails, try non-streaming
+                            print(f"[chat] Streaming failed: {stream_error}, trying non-streaming...")
+                            try:
+                                response = get_model_with_fallback(prompt, stream=False)
+                                if response.text:
+                                    yield response.text
+                            except Exception:
+                                # Will be caught by outer try-catch and fallback to local model
+                                raise
+                        # At the end, send a marker and the sources as JSON
+                        yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
+                    return StreamingResponse(stream_generator(), media_type="text/plain")
+            
+            except Exception as gemini_error:
+                # All Gemini models failed (quota exhausted) - fallback to local model
+                error_msg = str(gemini_error).lower()
+                is_quota_error = ("quota" in error_msg or "resource_exhausted" in error_msg or "429" in error_msg)
                 
-                # Translate to user's language
-                translated_response = await format_response_for_user(english_response, user_language)
+                print(f"[chat] All Gemini models failed: {gemini_error}")
+                if is_quota_error:
+                    print("[chat] Quota exhausted for all Gemini models, falling back to local model...")
+                else:
+                    print("[chat] Gemini API error, falling back to local model...")
                 
-                def stream_generator():
-                    yield translated_response
-                    yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
-                return StreamingResponse(stream_generator(), media_type="text/plain")
-            else:
-                # English selected - stream directly
-                def stream_generator():
-                    response_stream = model.generate_content(prompt, stream=True)
-                    for chunk in response_stream:
-                        if chunk.text:
-                            yield chunk.text
-                    # At the end, send a marker and the sources as JSON
-                    yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
-                return StreamingResponse(stream_generator(), media_type="text/plain")
+                # Fallback to local model
+                try:
+                    from fastapi.concurrency import run_in_threadpool
+                    import asyncio
+                    
+                    tokenizer, model = get_local_llm()
+                    
+                    # Format prompt for TinyLlama chat format (using English question)
+                    chat_prompt = f"<|system|>\n{prompt}</s>\n<|user|>\n{question_for_processing}</s>\n<|assistant|>\n"
+                    
+                    # Get device from model's first parameter (handles device_map="auto" case)
+                    try:
+                        device = next(model.parameters()).device
+                    except (StopIteration, AttributeError):
+                        device = "cpu"
+                    inputs = tokenizer(chat_prompt, return_tensors="pt", truncation=True, max_length=1024).to(device)
+                    input_length = inputs.input_ids.shape[1]
+                    
+                    def _generate():
+                        import torch
+                        with torch.no_grad():
+                            outputs = model.generate(
+                                inputs.input_ids,
+                                attention_mask=inputs.attention_mask if hasattr(inputs, 'attention_mask') else None,
+                                max_new_tokens=128,
+                                min_new_tokens=5,
+                                temperature=0.7,
+                                do_sample=True,
+                                top_p=0.9,
+                                top_k=50,
+                                repetition_penalty=1.1,
+                                pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id,
+                                eos_token_id=tokenizer.eos_token_id,
+                                use_cache=True
+                            )
+                            new_tokens = outputs[0][input_length:]
+                            return tokenizer.decode(new_tokens, skip_special_tokens=True)
+                    
+                    try:
+                        response_text = await asyncio.wait_for(
+                            run_in_threadpool(_generate),
+                            timeout=120.0
+                        )
+                    except asyncio.TimeoutError:
+                        response_text = "I apologize, but the response is taking longer than expected. Please try again with a shorter question."
+                    
+                    if "<|assistant|>" in response_text:
+                        response_text = response_text.split("<|assistant|>")[-1].strip()
+                    
+                    response_text = response_text.replace("<|system|>", "").replace("<|user|>", "").replace("</s>", "").strip()
+                    
+                    if not response_text or len(response_text) < 5:
+                        response_text = "I understand your question, but I'm having trouble generating a detailed response. Could you please rephrase your question?"
+                    
+                    # Step 4: Translate response to user's language (if needed)
+                    # Note: Translation also uses Gemini API, so if quota is exhausted, skip translation
+                    if needs_translation:
+                        try:
+                            response_text = await format_response_for_user(response_text, user_language)
+                            print(f"[chat] Translated local model response to {user_language}")
+                        except Exception as trans_error:
+                            print(f"[chat] Translation failed (quota likely exhausted): {trans_error}, user will see English response")
+                            # Continue with English response if translation fails
+                    
+                    def stream_generator():
+                        yield response_text
+                        yield "\n[[SOURCES]]" + JSONResponse(content={"sources": sources}).body.decode()
+                    
+                    return StreamingResponse(stream_generator(), media_type="text/plain")
+                
+                except Exception as local_error:
+                    # Even local model failed - return error
+                    print(f"[chat] Local model fallback also failed: {local_error}")
+                    return JSONResponse(
+                        status_code=500,
+                        content={"error": f"All models failed. Gemini error: {str(gemini_error)}, Local model error: {str(local_error)}"}
+                    )
         
         # ====================================================================
         # MODE 2: CHROMADB + LOCAL MODEL (Offline - No Internet Required)
