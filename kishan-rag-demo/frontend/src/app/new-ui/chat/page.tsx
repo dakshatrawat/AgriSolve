@@ -544,8 +544,7 @@ export default function NewUIChat() {
               </button>
             </div>
             <p className="text-center text-[12px] text-slate-400 mt-4">
-              AgriSolve can provide general guidance. Always cross-verify with
-              local agricultural experts for critical decisions.
+              AgriSolve provides guidance from official sources. Always cross-verify by visiting the sites provided in the sources button.
             </p>
           </div>
         </div>

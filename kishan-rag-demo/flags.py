@@ -22,7 +22,7 @@ Internet Usage:
 USE_CHROMADB = False  
 USE_PINECONE = True 
 USE_LOCAL_MODEL = False  
-USE_GEMINI_API = True 
+USE_GEMINI_API = True
 
 # UI Configuration - Only ONE should be True
 USE_OLD_UI = True  # Current UI with chat, voice, and language selection
