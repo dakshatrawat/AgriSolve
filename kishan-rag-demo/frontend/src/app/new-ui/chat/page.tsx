@@ -73,7 +73,17 @@ export default function NewUIChat() {
   const supportedLanguages = [
     { code: "en", name: "English" },
     { code: "hi", name: "Hindi (हिन्दी)" },
+    { code: "bn", name: "Bengali (বাংলা)" },
+    { code: "te", name: "Telugu (తెలుగు)" },
     { code: "mr", name: "Marathi (मराठी)" },
+    { code: "ta", name: "Tamil (தமிழ்)" },
+    { code: "gu", name: "Gujarati (ગુજરાતી)" },
+    { code: "kn", name: "Kannada (ಕನ್ನಡ)" },
+    { code: "ml", name: "Malayalam (മലയാളം)" },
+    { code: "pa", name: "Punjabi (ਪੰਜਾਬੀ)" },
+    { code: "or", name: "Odia (ଓଡ଼ିଆ)" },
+    { code: "as", name: "Assamese (অসমীয়া)" },
+    { code: "ur", name: "Urdu (اردو)" },
   ];
 
   const getTimestamp = (): string => {
@@ -287,10 +297,10 @@ export default function NewUIChat() {
   return (
     <div className="flex h-screen w-full bg-white">
       {/* Sidebar */}
-      <aside className="w-80 bg-green-50 border-r border-green-100 flex flex-col shrink-0">
-        <div className="p-8">
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-10">
+      <aside className="w-80 bg-green-50 border-r border-green-100 flex flex-col shrink-0 h-screen overflow-hidden">
+        {/* Logo - Fixed at top */}
+        <div className="p-8 pb-4 border-b border-green-100 shrink-0">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/new-ui")}
               className="size-10 bg-green-700 rounded-xl flex items-center justify-center text-white hover:bg-green-800 transition-colors"
@@ -301,7 +311,10 @@ export default function NewUIChat() {
               AgriSolve
             </h1>
           </div>
+        </div>
 
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-8">
           {/* Language Selection */}
           <div className="mb-10">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
@@ -355,8 +368,8 @@ export default function NewUIChat() {
           </div>
         </div>
 
-        {/* User Profile */}
-        <div className="mt-auto p-6 border-t border-green-100 bg-white/40">
+        {/* User Profile - Fixed at bottom */}
+        <div className="p-6 border-t border-green-100 bg-white/40 shrink-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
               <img
@@ -552,19 +565,6 @@ export default function NewUIChat() {
     </div>
   );
 }
-
-type Source = {
-  text: string;
-  doc_name?: string;
-  doc_url?: string;
-  chunk_index?: number;
-};
-
-type Message = {
-  sender: string;
-  text: string;
-  sources?: Source[];
-};
 
 const MessageBubble = ({
   message,

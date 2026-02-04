@@ -1,12 +1,16 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 import os
 import sys
 import fitz  # pymupdf
 import tempfile
+import shutil
+from pathlib import Path
+import time
 
 # Import feature flags from root directory
 _backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -88,6 +92,14 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 
+# Create uploads directory for storing PDF files
+UPLOADS_DIR = Path("./uploads")
+UPLOADS_DIR.mkdir(exist_ok=True)
+print(f"[main] Uploads directory: {UPLOADS_DIR.absolute()}")
+
+# Mount static files for serving uploaded PDFs
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+
 # Lazy load local SLM for fallback
 _local_tokenizer = None
 _local_model = None
@@ -156,10 +168,32 @@ async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form
         return JSONResponse(status_code=400, content={"error": "Only PDF files are supported."})
 
     try:
-        # Save uploaded file to a temporary location for pymupdf
+        # Read file content
+        file_content = await file.read()
+        
+        # Generate unique filename with timestamp
+        timestamp = int(time.time() * 1000)
+        safe_filename = file.filename.replace(" ", "-").replace("_", "-")
+        # Remove any path components for security
+        safe_filename = os.path.basename(safe_filename)
+        unique_filename = f"{os.path.splitext(safe_filename)[0]}-{timestamp}.pdf"
+        saved_file_path = UPLOADS_DIR / unique_filename
+        
+        # Save uploaded file permanently
+        with open(saved_file_path, "wb") as f:
+            f.write(file_content)
+        print(f"[upload] Saved PDF to: {saved_file_path}")
+        
+        # Also save to temporary location for pymupdf processing
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-            tmp.write(await file.read())
+            tmp.write(file_content)
             tmp_path = tmp.name
+
+        # Generate the URL for accessing the PDF
+        pdf_url = f"http://localhost:8000/uploads/{unique_filename}"
+        
+        # Use provided doc_url or generated PDF URL
+        final_doc_url = doc_url if doc_url else pdf_url
 
         doc = fitz.open(tmp_path)
         total_chunks = 0
@@ -175,7 +209,7 @@ async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form
                     text,
                     metadata={
                         "doc_name": file.filename,
-                        "doc_url": doc_url if doc_url else file.filename  # Use provided URL or filename as fallback
+                        "doc_url": final_doc_url  # Use provided URL or generated PDF URL
                     },
                     chunk_offset=total_chunks
                 )
@@ -183,8 +217,13 @@ async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form
                 print(f"Batch upserted: {num} chunks (total so far: {total_chunks})")
         doc.close()
         os.remove(tmp_path)
+        
         storage_info = "Pinecone" if flags.USE_PINECONE else "ChromaDB (stored locally in ./chroma_db)"
-        return {"message": f"PDF uploaded and {total_chunks} chunks upserted to {storage_info}."}
+        return {
+            "message": f"PDF uploaded and {total_chunks} chunks upserted to {storage_info}.",
+            "doc_url": final_doc_url,
+            "filename": unique_filename
+        }
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 

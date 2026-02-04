@@ -9,16 +9,8 @@ export default function RootPage() {
 
   useEffect(() => {
     setMounted(true);
-
-    // Route to new UI (set to /old-ui to use old UI instead)
-    // This can be controlled by the USE_NEW_UI flag from the backend
-    const useNewUI = true;
-
-    if (useNewUI) {
-      router.push("/new-ui");
-    } else {
-      router.push("/old-ui");
-    }
+    // Route to new UI
+    router.push("/new-ui");
   }, [router]);
 
   if (!mounted) {

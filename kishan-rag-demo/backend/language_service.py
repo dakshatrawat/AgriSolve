@@ -23,13 +23,35 @@ if GOOGLE_API_KEY:
 
 
 # Language code to name mapping
+# Supports all Indian languages that Whisper can transcribe
 LANGUAGE_MAP = {
     "en": "English",
     "hi": "Hindi",
+    "bn": "Bengali",
+    "te": "Telugu",
     "mr": "Marathi",
+    "ta": "Tamil",
+    "gu": "Gujarati",
+    "kn": "Kannada",
+    "ml": "Malayalam",
+    "pa": "Punjabi",
+    "or": "Odia",
+    "as": "Assamese",
+    "ur": "Urdu",
+    # Full names for backward compatibility
     "english": "English",
     "hindi": "Hindi",
-    "marathi": "Marathi"
+    "bengali": "Bengali",
+    "telugu": "Telugu",
+    "marathi": "Marathi",
+    "tamil": "Tamil",
+    "gujarati": "Gujarati",
+    "kannada": "Kannada",
+    "malayalam": "Malayalam",
+    "punjabi": "Punjabi",
+    "odia": "Odia",
+    "assamese": "Assamese",
+    "urdu": "Urdu"
 }
 
 # Model fallback list (in order of preference)

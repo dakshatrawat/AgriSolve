@@ -49,6 +49,9 @@ backend/chroma_data/
 *.pth
 *.onnx
 
+# Uploaded PDFs
+backend/uploads/
+
 # ML Models (download locally using download_models.py)
 backend/models/
 backend/chroma_data/
@@ -57,3 +60,6 @@ backend/chroma_data/
 *.pt
 *.pth
 *.onnx
+
+# Uploaded PDFs
+backend/uploads/

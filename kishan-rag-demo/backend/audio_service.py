@@ -222,7 +222,7 @@ async def transcribe_audio(audio_file: UploadFile, language: str = None) -> dict
     
     Args:
         audio_file: Uploaded audio file (webm, wav, mp3, ogg, m4a, etc.)
-        language: Language code (hi, en, mr) or None for auto-detect
+        language: Language code (en, hi, bn, te, mr, ta, gu, kn, ml, pa, or, as, ur) or None for auto-detect
     
     Returns:
         dict with 'text' and 'language' keys
@@ -305,7 +305,14 @@ async def transcribe_audio(audio_file: UploadFile, language: str = None) -> dict
         
         # Language processing: Use translate mode for non-English, transcribe for English
         # This ensures all output is in English for consistent processing
-        if language and language in ['hi', 'en', 'mr', 'hindi', 'english', 'marathi']:
+        # Supported Indian languages: hi, bn, te, mr, ta, gu, kn, ml, pa, or, as, ur
+        supported_indian_languages = [
+            'hi', 'bn', 'te', 'mr', 'ta', 'gu', 'kn', 'ml', 'pa', 'or', 'as', 'ur',
+            'hindi', 'bengali', 'telugu', 'marathi', 'tamil', 'gujarati', 
+            'kannada', 'malayalam', 'punjabi', 'odia', 'assamese', 'urdu'
+        ]
+        
+        if language and (language[:2].lower() in supported_indian_languages or language.lower() in supported_indian_languages):
             lang_code = language[:2].lower()  # Normalize to 2-letter code
             
             # For non-English: use translate mode to convert to English text
@@ -348,7 +355,12 @@ async def transcribe_audio(audio_file: UploadFile, language: str = None) -> dict
         
         # Return original language code (for translation tracking)
         # Note: transcription text is always in English due to translate mode
-        original_language = language[:2].lower() if language and language in ['hi', 'en', 'mr', 'hindi', 'english', 'marathi'] else "auto"
+        supported_indian_languages = [
+            'hi', 'bn', 'te', 'mr', 'ta', 'gu', 'kn', 'ml', 'pa', 'or', 'as', 'ur',
+            'hindi', 'bengali', 'telugu', 'marathi', 'tamil', 'gujarati', 
+            'kannada', 'malayalam', 'punjabi', 'odia', 'assamese', 'urdu'
+        ]
+        original_language = language[:2].lower() if language and (language[:2].lower() in supported_indian_languages or language.lower() in supported_indian_languages) else "auto"
         
         return {
             "text": transcription,  # Always English text (from translate mode)
