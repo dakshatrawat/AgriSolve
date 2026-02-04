@@ -374,8 +374,22 @@ async def chat_endpoint(request: ChatRequest):
         print(f"[chat] Normalized to English for processing: {question_for_processing[:100]}...")
         
         # Step 2: Vector search using English query (for better retrieval)
-        matches = await query_index(question_for_processing, top_k=5, return_metadata=True)
-        context = "\n".join([m["metadata"]["text"] for m in matches])
+        print(f"[chat] Starting vector search...")
+        try:
+            matches = await query_index(question_for_processing, top_k=5, return_metadata=True)
+            print(f"[chat] Vector search completed. Found {len(matches)} matches")
+        except Exception as e:
+            print(f"[chat] ERROR in vector search: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+        
+        if not matches:
+            print(f"[chat] WARNING: No matches found in vector search")
+            context = ""
+        else:
+            context = "\n".join([m["metadata"]["text"] for m in matches])
+            print(f"[chat] Context built: {len(context)} characters")
 
         # Format chat history for prompt (history is in user's language, but LLM can handle it)
         history_str = ""

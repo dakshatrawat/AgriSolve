@@ -84,6 +84,15 @@ export default function NewUIChat() {
     { code: "or", name: "Odia (ଓଡ଼ିଆ)" },
     { code: "as", name: "Assamese (অসমীয়া)" },
     { code: "ur", name: "Urdu (اردو)" },
+    { code: "sa", name: "Sanskrit (संस्कृतम्)" },
+    { code: "ne", name: "Nepali (नेपाली)" },
+    { code: "kok", name: "Konkani (कोंकणी)" },
+    { code: "mni", name: "Manipuri (ꯃꯅꯤꯄꯨꯔꯤ)" },
+    { code: "brx", name: "Bodo (बड़ो)" },
+    { code: "doi", name: "Dogri (डोगरी)" },
+    { code: "mai", name: "Maithili (मैथिली)" },
+    { code: "sat", name: "Santali (ᱥᱟᱱᱛᱟᱲᱤ)" },
+    { code: "ks", name: "Kashmiri (कॉशुर)" },
   ];
 
   const getTimestamp = (): string => {

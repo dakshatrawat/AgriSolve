@@ -169,21 +169,28 @@ async def query_index(query, top_k=3, return_metadata=False):
         else:
             error_msg += "Please install chromadb: pip install chromadb"
         raise ImportError(error_msg)
+    print(f"[chroma_service] Starting query_index for: '{query[:50]}...'")
     model = get_model()  # Lazy load model
+    print(f"[chroma_service] Embedding model loaded")
     cross_encoder = get_cross_encoder()  # Lazy load cross-encoder
+    print(f"[chroma_service] Cross-encoder loaded")
     
     # Step A: Retrieve candidates
     candidate_k = top_k * 3
+    print(f"[chroma_service] Generating embeddings (candidate_k={candidate_k})...")
     query_emb = await run_in_threadpool(model.encode, [query])
     query_emb = query_emb[0].tolist()
+    print(f"[chroma_service] Embeddings generated: {len(query_emb)} dimensions")
     
     # Run ChromaDB query in threadpool to avoid httpx issues
+    print(f"[chroma_service] Querying ChromaDB...")
     def do_query():
         return collection.query(
             query_embeddings=[query_emb],
             n_results=candidate_k
         )
     results = await run_in_threadpool(do_query)
+    print(f"[chroma_service] ChromaDB query completed")
     
     if not results or not results['documents'][0]:
         return [] if not return_metadata else []
@@ -198,8 +205,10 @@ async def query_index(query, top_k=3, return_metadata=False):
         candidates.append(candidate)
     
     # Step B: Cross-Encoder scoring
+    print(f"[chroma_service] Running cross-encoder on {len(candidates)} candidates...")
     pairs = [(query, c['document']) for c in candidates]
     scores = await run_in_threadpool(cross_encoder.predict, pairs)
+    print(f"[chroma_service] Cross-encoder scoring completed")
     
     # Step C: Sort by Cross-Encoder score (descending)
     candidates_with_scores = [
@@ -209,6 +218,7 @@ async def query_index(query, top_k=3, return_metadata=False):
     
     # Step D: Select top_k
     top_matches = [c for c, _ in candidates_with_scores[:top_k]]
+    print(f"[chroma_service] Query completed. Returning {len(top_matches)} top matches")
     
     if return_metadata:
         return top_matches

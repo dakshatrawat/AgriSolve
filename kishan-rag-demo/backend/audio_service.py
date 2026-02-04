@@ -218,11 +218,16 @@ def load_audio(file_path: str, target_sampling_rate: int = 16000) -> np.ndarray:
 
 async def transcribe_audio(audio_file: UploadFile, language: str = None) -> dict:
     """
-    Transcribe audio file to text using Whisper.
+    Transcribe audio file to text using ASR abstraction layer.
+    
+    This function now uses the ASR router which automatically:
+    - Detects language using Whisper
+    - Routes to IndicWhisper for Indian languages (higher accuracy)
+    - Falls back to Whisper if IndicWhisper fails or for non-Indian languages
     
     Args:
         audio_file: Uploaded audio file (webm, wav, mp3, ogg, m4a, etc.)
-        language: Language code (en, hi, bn, te, mr, ta, gu, kn, ml, pa, or, as, ur) or None for auto-detect
+        language: Language code (en, hi, bn, te, mr, ta, gu, kn, ml, pa, or, as, ur, sa, ne, kok, mni, brx, doi, mai, sat, ks) or None for auto-detect
     
     Returns:
         dict with 'text' and 'language' keys
