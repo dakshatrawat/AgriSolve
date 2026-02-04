@@ -134,7 +134,7 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/upload")
-async def upload_pdf(file: UploadFile = File(...), doc_url: str = Form(...)):
+async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form(None)):
     if not VECTOR_DB_AVAILABLE:
         if flags.USE_PINECONE:
             return JSONResponse(status_code=503, content={"error": "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"})
@@ -175,7 +175,7 @@ async def upload_pdf(file: UploadFile = File(...), doc_url: str = Form(...)):
                     text,
                     metadata={
                         "doc_name": file.filename,
-                        "doc_url": doc_url
+                        "doc_url": doc_url if doc_url else file.filename  # Use provided URL or filename as fallback
                     },
                     chunk_offset=total_chunks
                 )
