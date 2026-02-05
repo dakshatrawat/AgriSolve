@@ -13,7 +13,18 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
-pc = Pinecone(api_key=PINECONE_API_KEY)
+# Validate environment variables
+if not PINECONE_API_KEY:
+    raise ValueError("PINECONE_API_KEY is not set in .env file")
+if not PINECONE_ENVIRONMENT:
+    raise ValueError("PINECONE_ENVIRONMENT is not set in .env file")
+if not PINECONE_INDEX_NAME:
+    raise ValueError("PINECONE_INDEX_NAME is not set in .env file")
+
+print(f"[pinecone_service] Initializing Pinecone...")
+print(f"[pinecone_service] API Key: {PINECONE_API_KEY[:20]}...")
+print(f"[pinecone_service] Environment: {PINECONE_ENVIRONMENT}")
+print(f"[pinecone_service] Index Name: {PINECONE_INDEX_NAME}")
 
 # Parse environment for cloud/region
 if PINECONE_ENVIRONMENT and "-" in PINECONE_ENVIRONMENT:
@@ -21,12 +32,19 @@ if PINECONE_ENVIRONMENT and "-" in PINECONE_ENVIRONMENT:
 else:
     cloud, region = "aws", "us-east-1"
 
-pc = Pinecone(api_key=PINECONE_API_KEY)
+print(f"[pinecone_service] Cloud: {cloud}, Region: {region}")
+
+try:
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+    print(f"[pinecone_service] Pinecone client initialized successfully")
+except Exception as e:
+    print(f"[pinecone_service] ERROR: Failed to initialize Pinecone client: {e}")
+    raise
 
 
-# Embedding model: 1024-dim to match Pinecone index
-EMBED_MODEL_NAME = "BAAI/bge-large-en-v1.5"
-INDEX_DIM = 1024
+# Embedding model: 384-dim to match Pinecone index
+EMBED_MODEL_NAME = "all-MiniLM-L6-v2"  # 384 dimensions
+INDEX_DIM = 384
 # Bi-Encoder for fast retrieval
 model = SentenceTransformer(EMBED_MODEL_NAME)
 # Log embedding dimension at startup for sanity
@@ -44,17 +62,39 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 
 def get_or_create_index():
-    index_names = pc.list_indexes().names()
-    if PINECONE_INDEX_NAME not in index_names:
-        pc.create_index(
-            name=PINECONE_INDEX_NAME,
-            dimension=INDEX_DIM,
-            metric="cosine",
-            spec=ServerlessSpec(cloud=cloud, region=region)
-        )
-    return pc.Index(PINECONE_INDEX_NAME)
+    try:
+        print(f"[pinecone_service] Listing existing indexes...")
+        index_names = pc.list_indexes().names()
+        print(f"[pinecone_service] Found {len(index_names)} existing indexes: {index_names}")
+        
+        if PINECONE_INDEX_NAME not in index_names:
+            print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' not found. Creating new index with dimension {INDEX_DIM}...")
+            pc.create_index(
+                name=PINECONE_INDEX_NAME,
+                dimension=INDEX_DIM,
+                metric="cosine",
+                spec=ServerlessSpec(cloud=cloud, region=region)
+            )
+            print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' created successfully")
+        else:
+            print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' already exists")
+        
+        index = pc.Index(PINECONE_INDEX_NAME)
+        print(f"[pinecone_service] Connected to index '{PINECONE_INDEX_NAME}'")
+        return index
+    except Exception as e:
+        print(f"[pinecone_service] ERROR: Failed to get or create index: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
-index = get_or_create_index()
+try:
+    index = get_or_create_index()
+    print(f"[pinecone_service] Pinecone service initialized successfully")
+except Exception as e:
+    print(f"[pinecone_service] CRITICAL: Pinecone initialization failed: {e}")
+    index = None
+    raise
 
 
 async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):

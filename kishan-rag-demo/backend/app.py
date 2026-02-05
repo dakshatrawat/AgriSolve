@@ -32,7 +32,10 @@ if flags.USE_PINECONE:
         VECTOR_DB_AVAILABLE = True
         print("[main] Using Pinecone for vector storage (cloud-based)")
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"[main] ERROR: Pinecone not available: {e}")
+        print(f"[main] Full traceback:\n{error_trace}")
         VECTOR_DB_AVAILABLE = False
 
 elif flags.USE_CHROMADB:
