@@ -73,6 +73,9 @@ import torch
 # Import centralized language service
 from language_service import process_user_input, format_response_for_user, get_model_with_fallback
 
+# Import PDF RAG endpoint
+from pdf_rag_endpoint import router as pdf_rag_router
+
 app = FastAPI()
 
 origins = [
@@ -88,6 +91,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include PDF RAG router
+app.include_router(pdf_rag_router)
 
 
 load_dotenv()

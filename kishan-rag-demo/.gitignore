@@ -63,3 +63,6 @@ backend/chroma_data/
 
 # Uploaded PDFs
 backend/uploads/
+
+#trial
+experiments/
