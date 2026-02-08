@@ -67,11 +67,18 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
         JSON with processing results and ingestion status
     """
     try:
+        print(f"\n{'='*80}")
+        print(f"[PDF RAG] === STARTING SCRAPE AND INGEST ===")
+        print(f"[PDF RAG] URL: {request.url}")
+        print(f"[PDF RAG] Config: skip_image_pages={request.skip_image_pages}, extract_webpage={request.extract_webpage_content}")
+        print(f"[PDF RAG] Vector DB: {'Pinecone' if flags.USE_PINECONE else 'ChromaDB'}")
+        print(f"{'='*80}\n")
+        
         # Initialize processor
         processor = PDFRAGProcessor(min_text_length=request.min_text_length)
         
         # Process website - extract webpage content AND PDFs
-        print(f"\n[PDF RAG] Processing website: {request.url}")
+        print(f"[PDF RAG] 📥 Step 1: Processing website...")
         result = processor.process_website(
             request.url, 
             request.skip_image_pages,
@@ -95,7 +102,9 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
         # 1. Ingest webpage content first (if extracted)
         if request.extract_webpage_content and result.get('webpage_text'):
             try:
-                print(f"\n[PDF RAG] Ingesting webpage content from: {result['url']}")
+                print(f"\n[PDF RAG] 📄 Step 2: Ingesting WEBPAGE content...")
+                print(f"[PDF RAG] Webpage URL: {result['url']}")
+                print(f"[PDF RAG] Webpage text length: {len(result['webpage_text'])} characters")
                 
                 # Prepare metadata for webpage content
                 webpage_metadata = {
@@ -103,8 +112,10 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
                     "source_type": "webpage",
                     "content_type": "webpage_text"
                 }
+                print(f"[PDF RAG] Webpage metadata: {webpage_metadata}")
                 
                 # Ingest to vector database
+                print(f"[PDF RAG] Calling upsert_document for webpage...")
                 num_chunks = await upsert_document(
                     result['webpage_text'],
                     metadata=webpage_metadata
@@ -113,16 +124,23 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
                 webpage_chunks = num_chunks
                 total_chunks += num_chunks
                 
-                print(f"[PDF RAG] ✅ Ingested {num_chunks} chunks from webpage content")
+                print(f"[PDF RAG] ✅ Successfully ingested {num_chunks} webpage chunks to Pinecone")
+                print(f"[PDF RAG] Total chunks so far: {total_chunks}\n")
                 
             except Exception as e:
-                print(f"[PDF RAG] ⚠️ Error ingesting webpage content: {e}")
+                import traceback
+                print(f"[PDF RAG] ❌ Error ingesting webpage content: {e}")
+                traceback.print_exc()
         
         # 2. Ingest each PDF
-        for pdf_result in result.get('pdf_results', []):
+        print(f"\n[PDF RAG] 📚 Step 3: Processing {len(result.get('pdf_results', []))} PDFs...\n")
+        for idx, pdf_result in enumerate(result.get('pdf_results', []), 1):
             if pdf_result['success'] and pdf_result.get('text'):
                 try:
-                    print(f"\n[PDF RAG] Ingesting: {pdf_result['filename']}")
+                    print(f"[PDF RAG] --- PDF {idx}/{len(result.get('pdf_results', []))} ---")
+                    print(f"[PDF RAG] 📄 Ingesting: {pdf_result['filename']}")
+                    print(f"[PDF RAG] PDF URL: {pdf_result['url']}")
+                    print(f"[PDF RAG] PDF stats: {pdf_result['text_pages']}/{pdf_result['total_pages']} text pages, {len(pdf_result['text'])} chars")
                     
                     # Prepare metadata for PDF content
                     pdf_metadata = {
@@ -133,8 +151,10 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
                         "total_pages": pdf_result['total_pages'],
                         "text_pages": pdf_result['text_pages']
                     }
+                    print(f"[PDF RAG] PDF metadata: {pdf_metadata}")
                     
                     # Ingest to vector database
+                    print(f"[PDF RAG] Calling upsert_document for PDF...")
                     num_chunks = await upsert_document(
                         pdf_result['text'],
                         metadata=pdf_metadata
@@ -154,10 +174,13 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
                         'text_length': len(pdf_result['text'])
                     })
                     
-                    print(f"[PDF RAG] ✅ Ingested {num_chunks} chunks from {pdf_result['filename']}")
+                    print(f"[PDF RAG] ✅ Successfully ingested {num_chunks} PDF chunks to Pinecone")
+                    print(f"[PDF RAG] Total chunks so far: {total_chunks}\n")
                     
                 except Exception as e:
+                    import traceback
                     print(f"[PDF RAG] ❌ Error ingesting {pdf_result['filename']}: {e}")
+                    traceback.print_exc()
                     ingestion_results.append({
                         'filename': pdf_result['filename'],
                         'pdf_url': pdf_result['url'],
@@ -194,6 +217,15 @@ async def scrape_and_ingest_all_content(request: WebsiteScrapeRequest):
             message_parts.append(f"{successful_pdfs} PDFs")
         
         message = f"Ingested {' and '.join(message_parts) if message_parts else 'content'} - {total_chunks} total chunks to {storage_info}"
+        
+        print(f"\n{'='*80}")
+        print(f"[PDF RAG] === INGESTION SUMMARY ===")
+        print(f"[PDF RAG] ✅ Total chunks ingested to Pinecone: {total_chunks}")
+        print(f"[PDF RAG] 📄 Webpage chunks: {webpage_chunks}")
+        print(f"[PDF RAG] 📚 PDF chunks: {total_chunks - webpage_chunks}")
+        print(f"[PDF RAG] 📊 PDFs processed: {len(ingestion_results)}/{len(result.get('pdf_results', []))}")
+        print(f"[PDF RAG] 🎯 Message: {message}")
+        print(f"{'='*80}\n")
         
         return PDFIngestResponse(
             success=True,

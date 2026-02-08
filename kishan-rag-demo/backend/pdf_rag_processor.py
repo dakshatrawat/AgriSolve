@@ -42,9 +42,11 @@ class PDFRAGProcessor:
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
         
+        print(f"[Processor] 🌐 Fetching URL: {url}")
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
+        print(f"[Processor] ✅ Response: {response.status_code}, {len(response.content)} bytes")
         
         return url, BeautifulSoup(response.content, 'html.parser')
     
@@ -58,12 +60,14 @@ class PDFRAGProcessor:
         Returns:
             Extracted text content
         """
+        print(f"[Processor] 📖 Extracting webpage text...")
         # Remove script and style elements
         for script in soup(["script", "style", "nav", "footer", "header"]):
             script.decompose()
         
         # Get text
         text = soup.get_text(separator=' ', strip=True)
+        print(f"[Processor] ✅ Extracted {len(text)} characters from webpage")
         return text
     
     def find_pdf_links(self, base_url: str, soup: BeautifulSoup) -> List[Dict[str, str]]:
@@ -77,6 +81,7 @@ class PDFRAGProcessor:
         Returns:
             List of dictionaries with 'url' and 'filename' keys
         """
+        print(f"[Processor] 🔍 Searching for PDF links...")
         pdf_links = []
         links = soup.find_all('a', href=True)
         
@@ -92,6 +97,10 @@ class PDFRAGProcessor:
                     'filename': filename
                 })
         
+        print(f"[Processor] ✅ Found {len(pdf_links)} PDF link(s)")
+        for idx, pdf in enumerate(pdf_links, 1):
+            print(f"[Processor]    {idx}. {pdf['filename']} - {pdf['url']}")
+        
         return pdf_links
     
     def download_pdf(self, url: str) -> Optional[str]:
@@ -105,6 +114,7 @@ class PDFRAGProcessor:
             Path to temporary file, or None if download failed
         """
         try:
+            print(f"[Processor] ⬇️ Downloading PDF from: {url}")
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             
@@ -113,10 +123,11 @@ class PDFRAGProcessor:
             temp_file.write(response.content)
             temp_file.close()
             
+            print(f"[Processor] ✅ Downloaded {len(response.content)} bytes to: {temp_file.name}")
             return temp_file.name
             
         except Exception as e:
-            print(f"❌ Failed to download {url}: {e}")
+            print(f"[Processor] ❌ Failed to download {url}: {e}")
             return None
     
     def is_page_text_based(self, page) -> bool:
@@ -152,8 +163,10 @@ class PDFRAGProcessor:
         }
         
         try:
+            print(f"[Processor] 📝 Extracting text from PDF: {pdf_path}")
             doc = fitz.open(pdf_path)
             result['total_pages'] = len(doc)
+            print(f"[Processor] 📖 PDF has {result['total_pages']} page(s)")
             
             for page_num in range(len(doc)):
                 page = doc[page_num]
@@ -161,7 +174,7 @@ class PDFRAGProcessor:
                 # Check if page is text-based
                 if skip_image_pages and not self.is_page_text_based(page):
                     result['skipped_pages'] += 1
-                    print(f"  ⏭️  Skipping page {page_num + 1} (image-only)")
+                    print(f"[Processor]    ⏭️ Skipping page {page_num + 1} (image-only, < {self.min_text_length} chars)")
                     continue
                 
                 # Extract text
@@ -170,11 +183,13 @@ class PDFRAGProcessor:
                     result['text'] += text + "\n\n"
                     result['text_pages'] += 1
                     result['page_texts'].append((page_num + 1, text))
+                    print(f"[Processor]    ✅ Page {page_num + 1}: {len(text)} characters extracted")
             
             doc.close()
+            print(f"[Processor] ✅ Total: {result['text_pages']}/{result['total_pages']} pages with text, {len(result['text'])} chars")
             
         except Exception as e:
-            print(f"❌ Error extracting text from PDF: {e}")
+            print(f"[Processor] ❌ Error extracting text from PDF: {e}")
         
         return result
     
@@ -190,12 +205,13 @@ class PDFRAGProcessor:
         Returns:
             Dictionary with extracted text and metadata
         """
-        print(f"\n📄 Processing: {filename}")
-        print(f"   URL: {pdf_url}")
+        print(f"\n[Processor] === Processing PDF: {filename} ===")
+        print(f"[Processor] URL: {pdf_url}")
         
         # Download to temp file
         temp_path = self.download_pdf(pdf_url)
         if not temp_path:
+            print(f"[Processor] ❌ Download failed for {filename}")
             return {
                 'success': False,
                 'filename': filename,
@@ -208,10 +224,11 @@ class PDFRAGProcessor:
             # Extract text
             extraction_result = self.extract_text_from_pdf(temp_path, skip_image_pages)
             
-            print(f"   📊 Pages: {extraction_result['total_pages']} total, "
-                  f"{extraction_result['text_pages']} with text, "
-                  f"{extraction_result['skipped_pages']} skipped")
-            print(f"   📝 Extracted: {len(extraction_result['text'])} characters")
+            print(f"[Processor] 📊 Summary for {filename}:")
+            print(f"[Processor]    Total pages: {extraction_result['total_pages']}")
+            print(f"[Processor]    Text pages: {extraction_result['text_pages']}")
+            print(f"[Processor]    Skipped pages: {extraction_result['skipped_pages']}")
+            print(f"[Processor]    Characters extracted: {len(extraction_result['text'])}")
             
             return {
                 'success': True,
@@ -229,6 +246,7 @@ class PDFRAGProcessor:
             # Clean up temp file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+                print(f"[Processor] 🧹 Cleaned up temp file: {temp_path}")
     
     def process_website(self, url: str, skip_image_pages: bool = True, 
                        extract_webpage_content: bool = True) -> Dict:
@@ -243,7 +261,8 @@ class PDFRAGProcessor:
         Returns:
             Dictionary with webpage content and list of processed PDF results
         """
-        print(f"\n🔍 Scraping website: {url}")
+        print(f"\n[Processor] === STARTING WEBSITE PROCESSING ===")
+        print(f"[Processor] 🌐 Target URL: {url}")
         
         try:
             # Scrape website
@@ -252,22 +271,30 @@ class PDFRAGProcessor:
             # Extract webpage content
             webpage_text = ""
             if extract_webpage_content:
+                print(f"[Processor] 📝 Extracting webpage content...")
                 webpage_text = self.extract_webpage_text(soup)
-                print(f"   📄 Extracted {len(webpage_text)} characters from webpage")
+            else:
+                print(f"[Processor] ⚠️ Skipping webpage content extraction (extract_webpage_content=False)")
             
             # Find PDF links
             pdf_links = self.find_pdf_links(resolved_url, soup)
-            print(f"   Found {len(pdf_links)} PDF(s)")
             
             # Process each PDF
+            print(f"\n[Processor] 📚 Processing {len(pdf_links)} PDF(s)...")
             pdf_results = []
-            for pdf_info in pdf_links:
+            for idx, pdf_info in enumerate(pdf_links, 1):
+                print(f"\n[Processor] --- PDF {idx}/{len(pdf_links)} ---")
                 result = self.process_pdf_from_url(
                     pdf_info['url'],
                     pdf_info['filename'],
                     skip_image_pages
                 )
                 pdf_results.append(result)
+            
+            print(f"\n[Processor] === WEBSITE PROCESSING COMPLETE ===")
+            print(f"[Processor] ✅ Webpage text: {len(webpage_text)} chars")
+            print(f"[Processor] ✅ PDFs found: {len(pdf_links)}")
+            print(f"[Processor] ✅ PDFs processed: {len(pdf_results)}")
             
             return {
                 'success': True,
@@ -279,7 +306,9 @@ class PDFRAGProcessor:
             }
             
         except Exception as e:
-            print(f"❌ Error processing website: {e}")
+            import traceback
+            print(f"[Processor] ❌ Error processing website: {e}")
+            traceback.print_exc()
             return {
                 'success': False,
                 'url': url,
