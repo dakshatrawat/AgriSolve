@@ -9,6 +9,10 @@ type Source = {
   doc_name?: string;
   doc_url?: string;
   chunk_index?: number;
+  // New fields for website/PDF source tracking
+  source?: string;        // URL of the webpage or PDF
+  source_type?: string;   // "webpage" or "pdf"
+  page_url?: string;      // For PDFs: the webpage where the PDF link was found
 };
 
 type Message = {
@@ -491,23 +495,55 @@ export default function NewUIChat() {
                                 key={sourceIdx}
                                 className="p-3 bg-green-50 border-l-4 border-green-500 rounded text-xs text-slate-700"
                               >
-                                {source.doc_name && (
-                                  <p className="font-semibold text-green-800 mb-1">
-                                    📄 {source.doc_name}
-                                  </p>
-                                )}
+                                {/* Source Type & Name Header */}
+                                <div className="font-semibold text-green-800 mb-1 flex items-center gap-1">
+                                  {source.source_type === "pdf" ? (
+                                    <>📄 {source.doc_name || "PDF Document"}</>
+                                  ) : source.source_type === "webpage" ? (
+                                    <>🌐 Webpage Content</>
+                                  ) : source.doc_name ? (
+                                    <>📄 {source.doc_name}</>
+                                  ) : null}
+                                </div>
+                                
+                                {/* Source Text Preview */}
                                 <p className="line-clamp-3 text-slate-600 italic">
                                   "{source.text}"
                                 </p>
-                                {source.doc_url && (
+                                
+                                {/* Source URL - Priority: source > doc_url */}
+                                {(source.source || source.doc_url) && (
                                   <a
-                                    href={source.doc_url}
+                                    href={source.source || source.doc_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-green-700 hover:text-green-800 underline mt-1 inline-block"
+                                    className="text-green-700 hover:text-green-800 underline mt-2 inline-flex items-center gap-1"
                                   >
-                                    View Document →
+                                    <span className="material-symbols-outlined text-sm">
+                                      {source.source_type === "pdf" ? "picture_as_pdf" : "link"}
+                                    </span>
+                                    {source.source_type === "pdf" 
+                                      ? "Open PDF →" 
+                                      : source.source_type === "webpage"
+                                        ? "View Webpage →"
+                                        : "View Source →"
+                                    }
                                   </a>
+                                )}
+                                
+                                {/* Show parent webpage URL for PDFs found on a page */}
+                                {source.source_type === "pdf" && source.page_url && (
+                                  <div className="mt-1 text-[10px] text-slate-500">
+                                    Found on:{" "}
+                                    <a
+                                      href={source.page_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:text-green-700 underline"
+                                    >
+                                      {source.page_url}
+                                    </a>
+                                  </div>
                                 )}
                               </div>
                             ))}

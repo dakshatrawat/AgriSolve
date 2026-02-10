@@ -2,11 +2,144 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function NewUILanding() {
   const router = useRouter();
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [scrapeResult, setScrapeResult] = useState<{
+    success: boolean;
+    message: string;
+    total_chunks_ingested?: number;
+  } | null>(null);
+
+  const handleScrapeAndIngest = async () => {
+    if (!websiteUrl.trim()) return;
+    
+    setIsLoading(true);
+    setScrapeResult(null);
+    
+    try {
+      const response = await fetch("http://localhost:8000/api/pdf-rag/scrape-and-ingest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: websiteUrl,
+          skip_image_pages: true,
+          extract_webpage_content: true,
+        }),
+      });
+      
+      const data = await response.json();
+      setScrapeResult(data);
+      
+      if (data.success) {
+        setTimeout(() => {
+          setShowLinkModal(false);
+          setWebsiteUrl("");
+          setScrapeResult(null);
+        }, 3000);
+      }
+    } catch (error) {
+      setScrapeResult({
+        success: false,
+        message: "Failed to connect to server. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
+    <>
+      {/* Link Scrape Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#111812] rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-[#dbe6dc] dark:border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-[#2bee3b]/10 rounded-xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#2bee3b] text-2xl">link</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#111812] dark:text-white">Analyze Website</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Extract content from any webpage</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setWebsiteUrl("");
+                  setScrapeResult(null);
+                }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined text-gray-500">close</span>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Website URL
+                </label>
+                <input
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://example.com/agriculture-guide"
+                  className="w-full px-4 py-3 rounded-xl border border-[#dbe6dc] dark:border-white/20 bg-white dark:bg-[#0a120b] text-[#111812] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2bee3b] focus:border-transparent transition-all"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                AgriSolve will scrape the webpage content and any linked PDFs, then add them to your knowledge base for intelligent Q&A.
+              </p>
+              
+              {scrapeResult && (
+                <div className={`p-4 rounded-xl ${scrapeResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`material-symbols-outlined ${scrapeResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                      {scrapeResult.success ? 'check_circle' : 'error'}
+                    </span>
+                    <p className={`text-sm font-medium ${scrapeResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                      {scrapeResult.message}
+                    </p>
+                  </div>
+                  {scrapeResult.success && scrapeResult.total_chunks_ingested && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1 ml-7">
+                      {scrapeResult.total_chunks_ingested} chunks added to knowledge base
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              <button
+                onClick={handleScrapeAndIngest}
+                disabled={isLoading || !websiteUrl.trim()}
+                className="w-full py-4 bg-[#2bee3b] text-[#111812] rounded-xl font-bold text-lg hover:bg-[#24c932] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined">cloud_download</span>
+                    Scrape & Ingest
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
       {/* Navigation Bar */}
       <nav className="sticky top-0 z-[100] w-full bg-white/80 dark:bg-[#0a120b]/80 backdrop-blur-md border-b border-[#dbe6dc] dark:border-white/10">
@@ -81,6 +214,13 @@ export default function NewUILanding() {
             >
               <span className="material-symbols-outlined">upload_file</span>
               Analyze Documents
+            </button>
+            <button
+              onClick={() => setShowLinkModal(true)}
+              className="w-full sm:w-auto px-10 py-5 bg-white/20 backdrop-blur-xl border border-white/40 text-white rounded-full text-lg font-bold hover:bg-white/30 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined">link</span>
+              Analyze Website
             </button>
           </div>
         </div>
@@ -191,5 +331,6 @@ export default function NewUILanding() {
         }
       `}</style>
     </div>
+    </>
   );
 }

@@ -105,7 +105,9 @@ text_splitter = RecursiveCharacterTextSplitter(
 async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
     """
     Upsert document chunks into ChromaDB
-    Accept doc_name and doc_url in metadata
+    Preserves ALL metadata fields from input including:
+    - doc_name, doc_url (for uploaded PDFs)
+    - source, source_type, page_url (for scraped webpages/PDFs)
     """
     if not CHROMA_AVAILABLE or client is None or collection is None:
         error_msg = "ChromaDB is not available. "
@@ -115,10 +117,10 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
             error_msg += "Please install chromadb: pip install chromadb"
         raise ImportError(error_msg)
     model = get_model()  # Lazy load model
-    doc_name = metadata.get("doc_name") if metadata else None
-    doc_url = metadata.get("doc_url") if metadata else None
     chunks = text_splitter.split_text(text)
     total_chunks = len(chunks)
+    
+    print(f"[chroma_service] Upserting {total_chunks} chunks with metadata: {metadata}")
     
     for batch_start in range(0, total_chunks, batch_size):
         batch_chunks = chunks[batch_start:batch_start+batch_size]
@@ -130,14 +132,18 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
         documents = []
         
         for i, chunk in enumerate(batch_chunks):
+            # Start with base metadata
             chunk_metadata = {
                 "text": chunk,
                 "chunk_index": str(chunk_offset + batch_start + i)
             }
-            if doc_name:
-                chunk_metadata["doc_name"] = doc_name
-            if doc_url:
-                chunk_metadata["doc_url"] = doc_url
+            
+            # Preserve ALL metadata fields from input
+            if metadata:
+                for key, value in metadata.items():
+                    # Convert non-string values to strings for ChromaDB compatibility
+                    if value is not None:
+                        chunk_metadata[key] = str(value) if not isinstance(value, str) else value
             
             metadatas.append(chunk_metadata)
             documents.append(chunk)
@@ -151,6 +157,7 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
             metadatas=metadatas
         )
     
+    print(f"[chroma_service] Successfully upserted {total_chunks} chunks")
     return total_chunks
 
 
