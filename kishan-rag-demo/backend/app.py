@@ -316,6 +316,23 @@ async def chat_endpoint(request: ChatRequest):
     """
     Multilingual Chat Endpoint
     
+    ========================================================================
+    KEY PIPELINE POINTS (README Reference):
+    ========================================================================
+    [POINT 5] QUERY PROCESSING - process_user_input() normalizes to English
+    [POINT 6] QUERY CHUNKING - Handled by vector search embedding
+    [POINT 7] VECTOR SEARCH - query_index() with cosine similarity
+    [POINT 8] TOP 15 CANDIDATES - Retrieved from vector DB (top_k * 3)
+    [POINT 9] RERANKING - Cross-encoder selects best matches
+    [POINT 10] LLM PROCESSING - Gemini models or TinyLlama for response
+    ========================================================================
+    MODELS USED:
+    - Query Embedding: all-MiniLM-L6-v2
+    - Reranking: cross-encoder/ms-marco-MiniLM-L-6-v2
+    - LLM: gemini-2.5-flash (primary), TinyLlama-1.1B (fallback)
+    - Translation: Gemini models via language_service.py
+    ========================================================================
+    
     LANGUAGE PROCESSING PIPELINE:
     ==============================
     
@@ -382,7 +399,11 @@ async def chat_endpoint(request: ChatRequest):
         
         print(f"[chat] Normalized to English for processing: {question_for_processing[:100]}...")
         
+        # [POINT 5] QUERY PROCESSING - Normalize user input to English
         # Step 2: Vector search using English query (for better retrieval)
+        # [POINT 7] VECTOR SEARCH WITH COSINE SIMILARITY
+        # [POINT 8] TOP 15 CANDIDATES RETRIEVED (top_k=5 * 3 = 15)
+        # [POINT 9] RERANKING DONE INSIDE query_index()
         print(f"[chat] Starting vector search...")
         try:
             matches = await query_index(question_for_processing, top_k=5, return_metadata=True)
@@ -426,7 +447,10 @@ async def chat_endpoint(request: ChatRequest):
         sources = [m["metadata"] for m in matches]
         
         # ====================================================================
+        # [POINT 10] LLM PROCESSING - Generate response using top chunks
         # MODE 1: PINECONE + GEMINI API (Fast, Streaming - with fallback)
+        # Models: gemini-2.5-flash -> gemini-2.5-flash-lite -> gemini-3-flash
+        # Fallback: TinyLlama-1.1B-Chat-v1.0 (local model)
         # ====================================================================
         if flags.USE_PINECONE and flags.USE_GEMINI_API:
             if not GOOGLE_API_KEY:
@@ -565,7 +589,9 @@ async def chat_endpoint(request: ChatRequest):
                     )
         
         # ====================================================================
+        # [POINT 10] LLM PROCESSING - Generate response using top chunks
         # MODE 2: CHROMADB + LOCAL MODEL (Offline - No Internet Required)
+        # Model: TinyLlama-1.1B-Chat-v1.0 (local, no API calls)
         # ====================================================================
         elif flags.USE_CHROMADB and flags.USE_LOCAL_MODEL:
             # Use local LLM directly (no API calls, fully offline)

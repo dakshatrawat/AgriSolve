@@ -1,3 +1,14 @@
+# ============================================================================
+# AUDIO SERVICE - VOICE TRANSCRIPTION
+# ============================================================================
+# KEY PIPELINE POINTS (README Reference):
+# [POINT 5] QUERY PROCESSING - Transcribes voice input to text for processing
+# ============================================================================
+# MODEL USED:
+# - Whisper Small (openai/whisper-small) - Multilingual ASR
+# - Supports: Hindi, English, Marathi, Bengali, Tamil, Telugu, etc.
+# ============================================================================
+
 import os
 import sys
 import subprocess

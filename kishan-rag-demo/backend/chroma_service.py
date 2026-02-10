@@ -1,5 +1,20 @@
 import os
 from dotenv import load_dotenv
+
+# ============================================================================
+# CHROMA SERVICE - LOCAL VECTOR DATABASE
+# ============================================================================
+# KEY PIPELINE POINTS (README Reference):
+# [POINT 4] METADATA STORAGE - Stores doc_name, doc_url, source, source_type
+# [POINT 7] VECTOR SEARCH - Uses cosine similarity via ChromaDB query
+# [POINT 8] TOP 15 CANDIDATES - Retrieves top_k * 3 candidates for reranking
+# [POINT 9] CROSS-ENCODER RERANKING - ms-marco-MiniLM-L-6-v2 reranks results
+# ============================================================================
+# MODELS USED:
+# - Embedding: all-MiniLM-L6-v2 (384 dimensions)
+# - Reranking: cross-encoder/ms-marco-MiniLM-L-6-v2
+# ============================================================================
+
 CHROMA_AVAILABLE = False
 chromadb = None
 chromadb_error = None
@@ -102,6 +117,11 @@ text_splitter = RecursiveCharacterTextSplitter(
 )
 
 
+# ============================================================================
+# [POINT 4] METADATA PRESERVATION IN VECTOR DATABASE
+# Stores all metadata fields: doc_name, doc_url, source, source_type, page_url
+# [POINT 2] CHUNKING - RecursiveCharacterTextSplitter (500 chars, 50 overlap)
+# ============================================================================
 async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
     """
     Upsert document chunks into ChromaDB
@@ -161,6 +181,17 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
     return total_chunks
 
 
+# ============================================================================
+# [POINT 7] HYBRID SEARCH - SEMANTIC + EMBEDDING
+# [POINT 8] TOP 15 CANDIDATES RETRIEVAL (top_k * 3 = 15 for top_k=5)
+# [POINT 9] CROSS-ENCODER RERANKING FOR BEST SIMILARITY
+# ============================================================================
+# SEARCH PROCESS:
+# Step A: Generate query embedding using all-MiniLM-L6-v2
+# Step B: Retrieve 15 candidates via cosine similarity (ChromaDB query)
+# Step C: Rerank using cross-encoder/ms-marco-MiniLM-L-6-v2
+# Step D: Return top_k best matches based on reranked scores
+# ============================================================================
 async def query_index(query, top_k=3, return_metadata=False):
     """
     Query the ChromaDB collection with cross-encoder re-ranking

@@ -6,6 +6,17 @@ This module handles ALL language-related operations:
 - Hinglish/phonetic text normalization
 - Language detection and validation
 
+============================================================================
+KEY PIPELINE POINTS (README Reference):
+============================================================================
+[POINT 5] QUERY PROCESSING - process_user_input() normalizes query to English
+[POINT 10] LLM MODEL FALLBACK - get_model_with_fallback() tries multiple Gemini models
+============================================================================
+MODELS USED:
+- Translation: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-3-flash (fallback chain)
+- Supports: Hindi, Marathi, Bengali, Telugu, Tamil, Gujarati, Kannada, Malayalam, etc.
+============================================================================
+
 CRITICAL PRINCIPLE:
 - User sees ONLY their selected language
 - Internal processing is ALWAYS in English

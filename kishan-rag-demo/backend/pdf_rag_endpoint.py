@@ -7,6 +7,15 @@ downloading PDFs, and ingesting ALL content into vector database.
 Extracts BOTH webpage text AND PDF documents from the URL.
 Each chunk includes metadata about its source (webpage URL or PDF URL).
 
+============================================================================
+KEY PIPELINE POINTS (README Reference):
+============================================================================
+[POINT 1] WEB SCRAPING - Orchestrates PDFRAGProcessor.process_website()
+[POINT 2] CONTENT CHUNKING - upsert_document() uses RecursiveCharacterTextSplitter
+[POINT 3] PDF SCRAPING - Downloads and processes PDFs from discovered links
+[POINT 4] METADATA STORAGE - source, source_type, doc_name, page_url stored
+============================================================================
+
 Add to backend/app.py:
     from pdf_rag_endpoint import router as pdf_rag_router
     app.include_router(pdf_rag_router)

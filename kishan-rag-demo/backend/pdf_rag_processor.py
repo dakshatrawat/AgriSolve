@@ -5,6 +5,15 @@ Scrapes websites, downloads PDFs to tempfile, extracts text (skipping image-only
 chunks the content, and prepares it for RAG vector database ingestion.
 
 This extracts BOTH webpage text content AND PDF documents from the URL.
+
+============================================================================
+KEY PIPELINE POINTS (README Reference):
+============================================================================
+[POINT 1] WEB SCRAPING - scrape_website() method fetches webpage content
+[POINT 2] CONTENT CHUNKING - chunk_text_for_rag() breaks content into chunks with overlap
+[POINT 3] PDF SCRAPING - find_pdf_links() discovers PDFs, download_pdf() fetches them
+[POINT 4] METADATA EXTRACTION - process_website() collects source URLs, filenames, page counts
+============================================================================
 """
 import os
 import sys
@@ -29,6 +38,11 @@ class PDFRAGProcessor:
         """
         self.min_text_length = min_text_length
         
+    # ========================================================================
+    # [POINT 1] WEB SCRAPING FROM GIVEN LINK
+    # Uses requests library to fetch webpage content
+    # BeautifulSoup parses HTML for text and PDF link extraction
+    # ========================================================================
     def scrape_website(self, url: str) -> Tuple[str, BeautifulSoup]:
         """
         Scrape website and return soup object
@@ -70,6 +84,11 @@ class PDFRAGProcessor:
         print(f"[Processor] ✅ Extracted {len(text)} characters from webpage")
         return text
     
+    # ========================================================================
+    # [POINT 3] PDF LINK DISCOVERY FROM WEBPAGE
+    # Scans all anchor tags for .pdf extensions
+    # Resolves relative URLs to absolute PDF links
+    # ========================================================================
     def find_pdf_links(self, base_url: str, soup: BeautifulSoup) -> List[Dict[str, str]]:
         """
         Find all PDF links on the page
@@ -316,6 +335,12 @@ class PDFRAGProcessor:
             }
 
 
+# ============================================================================
+# [POINT 2] & [POINT 6] TEXT CHUNKING FOR RAG
+# Breaks content into 500-char chunks with 50-char overlap
+# Overlap ensures context continuity between chunks
+# Used for both document ingestion and query processing
+# ============================================================================
 def chunk_text_for_rag(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> List[str]:
     """
     Chunk text for RAG ingestion
