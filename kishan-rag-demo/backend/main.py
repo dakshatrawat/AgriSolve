@@ -88,10 +88,7 @@ def ensure_vector_db_initialized():
             _set_vector_db_unavailable(error_str)
 
     VECTOR_DB_INITIALIZED = True
-from audio_service import transcribe_audio
 import google.generativeai as genai
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
 
 app = FastAPI()
 
@@ -119,15 +116,27 @@ if GOOGLE_API_KEY:
 # Lazy load local SLM for fallback
 _local_tokenizer = None
 _local_model = None
+_audio_transcribe_fn = None
 LOCAL_MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Small 1.1B model
 MODELS_DIR = "./models"
 LOCAL_LLM_PATH = os.path.join(MODELS_DIR, "tinyllama-chat")
 USE_LOCAL_LLM = os.path.exists(LOCAL_LLM_PATH)
 
+
+def get_transcribe_audio_fn():
+    """Lazy import audio transcription to avoid heavy startup imports."""
+    global _audio_transcribe_fn
+    if _audio_transcribe_fn is None:
+        from audio_service import transcribe_audio as _transcribe_audio
+        _audio_transcribe_fn = _transcribe_audio
+    return _audio_transcribe_fn
+
 def get_local_llm():
     """Lazy load local LLM for fallback when API quota exceeded"""
     global _local_tokenizer, _local_model
     if _local_tokenizer is None or _local_model is None:
+        from transformers import AutoTokenizer, AutoModelForCausalLM
+        import torch
         model_path = LOCAL_LLM_PATH if USE_LOCAL_LLM else LOCAL_MODEL_NAME
         print(f"[main] Loading local LLM from: {model_path}...")
         _local_tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -275,6 +284,7 @@ async def transcribe_endpoint(
         JSON with 'text' and 'language' fields
     """
     try:
+        transcribe_audio = get_transcribe_audio_fn()
         result = await transcribe_audio(audio, language)
         return JSONResponse(content={
             "text": result["text"],
