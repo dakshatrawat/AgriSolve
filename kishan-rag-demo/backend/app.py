@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
@@ -81,16 +81,43 @@ app = FastAPI()
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
-    "http://localhost:3002"
+    "http://localhost:3002",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?|null|vscode-webview://.*|chrome-extension://.*|moz-extension://.*)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def options_fallback_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        origin = request.headers.get("origin", "*")
+        request_headers = request.headers.get("access-control-request-headers", "*")
+        request_method = request.headers.get("access-control-request-method", "POST")
+
+        return JSONResponse(
+            status_code=200,
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Methods": request_method,
+                "Access-Control-Allow-Headers": request_headers,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Max-Age": "600",
+                "Vary": "Origin",
+            },
+        )
+
+    return await call_next(request)
 
 # Include PDF RAG router
 app.include_router(pdf_rag_router)
