@@ -20,46 +20,74 @@ from language_service import get_model_with_fallback
 # VECTOR DATABASE INITIALIZATION (Based on flags)
 # ============================================================================
 VECTOR_DB_AVAILABLE = False
+VECTOR_DB_INITIALIZED = False
+VECTOR_DB_ERROR = None
 upsert_document = None
 query_index = None
 
-if flags.USE_PINECONE:
-    try:
-        from pinecone_service import upsert_document, query_index
-        VECTOR_DB_AVAILABLE = True
-        print("[main] Using Pinecone for vector storage (cloud-based)")
-    except Exception as e:
-        print(f"[main] ERROR: Pinecone not available: {e}")
-        VECTOR_DB_AVAILABLE = False
+def _set_vector_db_unavailable(error_str: str):
+    global VECTOR_DB_AVAILABLE, VECTOR_DB_ERROR, upsert_document, query_index
+    VECTOR_DB_AVAILABLE = False
+    VECTOR_DB_ERROR = error_str
 
-elif flags.USE_CHROMADB:
-    try:
-        import chroma_service
-        if chroma_service.CHROMA_AVAILABLE and chroma_service.client is not None and chroma_service.collection is not None:
-            from chroma_service import upsert_document, query_index
-            VECTOR_DB_AVAILABLE = True
-            print("[main] Using ChromaDB for vector storage (local, persistent at ./chroma_db)")
-        else:
-            error_msg = getattr(chroma_service, 'chromadb_error', 'ChromaDB not properly initialized')
-            raise ImportError(error_msg)
-    except (ImportError, AttributeError) as e:
-        error_str = str(e)
-        print(f"[main] ERROR: ChromaDB not available: {error_str}")
+    async def _upsert_unavailable(*args, **kwargs):
         if "Python 3.14" in error_str:
-            print("[main] ChromaDB requires Python 3.11 or 3.12. Current Python version is incompatible.")
-            print("[main] Please use Python 3.11 or 3.12, or install chromadb: pip install chromadb")
-        else:
-            print("[main] Please install chromadb: pip install chromadb")
-        VECTOR_DB_AVAILABLE = False
-        # Create dummy functions that raise clear errors
-        async def upsert_document(*args, **kwargs):
+            raise Exception("ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12.")
+        raise Exception(error_str)
+
+    async def _query_unavailable(*args, **kwargs):
+        if "Python 3.14" in error_str:
+            raise Exception("ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12.")
+        raise Exception(error_str)
+
+    upsert_document = _upsert_unavailable
+    query_index = _query_unavailable
+
+
+def ensure_vector_db_initialized():
+    """Lazy init vector DB to avoid slow startup blocking server port binding."""
+    global VECTOR_DB_AVAILABLE, VECTOR_DB_INITIALIZED, upsert_document, query_index
+
+    if VECTOR_DB_INITIALIZED:
+        return
+
+    print("[main] Initializing vector database providers...")
+
+    if flags.USE_PINECONE:
+        try:
+            from pinecone_service import upsert_document as pinecone_upsert_document, query_index as pinecone_query_index
+            upsert_document = pinecone_upsert_document
+            query_index = pinecone_query_index
+            VECTOR_DB_AVAILABLE = True
+            print("[main] Using Pinecone for vector storage (cloud-based)")
+        except Exception as e:
+            error_str = f"Pinecone is not available: {e}"
+            print(f"[main] ERROR: {error_str}")
+            _set_vector_db_unavailable(error_str)
+
+    elif flags.USE_CHROMADB:
+        try:
+            import chroma_service
+            if chroma_service.CHROMA_AVAILABLE and chroma_service.client is not None and chroma_service.collection is not None:
+                from chroma_service import upsert_document as chroma_upsert_document, query_index as chroma_query_index
+                upsert_document = chroma_upsert_document
+                query_index = chroma_query_index
+                VECTOR_DB_AVAILABLE = True
+                print("[main] Using ChromaDB for vector storage (local, persistent at ./chroma_db)")
+            else:
+                error_msg = getattr(chroma_service, 'chromadb_error', 'ChromaDB not properly initialized')
+                raise ImportError(error_msg)
+        except (ImportError, AttributeError) as e:
+            error_str = str(e)
+            print(f"[main] ERROR: ChromaDB not available: {error_str}")
             if "Python 3.14" in error_str:
-                raise Exception("ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12.")
-            raise Exception("ChromaDB is not available. Please install chromadb: pip install chromadb")
-        async def query_index(*args, **kwargs):
-            if "Python 3.14" in error_str:
-                raise Exception("ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12.")
-            raise Exception("ChromaDB is not available. Please install chromadb: pip install chromadb")
+                print("[main] ChromaDB requires Python 3.11 or 3.12. Current Python version is incompatible.")
+                print("[main] Please use Python 3.11 or 3.12, or install chromadb: pip install chromadb")
+            else:
+                print("[main] Please install chromadb: pip install chromadb")
+            _set_vector_db_unavailable(error_str)
+
+    VECTOR_DB_INITIALIZED = True
 from audio_service import transcribe_audio
 import google.generativeai as genai
 from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -174,9 +202,11 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/upload")
 async def upload_pdf(file: UploadFile = File(...), doc_url: str = Form(...)):
+    ensure_vector_db_initialized()
     if not VECTOR_DB_AVAILABLE:
         if flags.USE_PINECONE:
-            return JSONResponse(status_code=503, content={"error": "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"})
+            error_msg = VECTOR_DB_ERROR or "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"
+            return JSONResponse(status_code=503, content={"error": error_msg})
         else:
             error_msg = "ChromaDB is not available. "
             try:
@@ -260,9 +290,11 @@ async def transcribe_endpoint(
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
+    ensure_vector_db_initialized()
     if not VECTOR_DB_AVAILABLE:
         if flags.USE_PINECONE:
-            return JSONResponse(status_code=503, content={"error": "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"})
+            error_msg = VECTOR_DB_ERROR or "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"
+            return JSONResponse(status_code=503, content={"error": error_msg})
         else:
             error_msg = "ChromaDB is not available. "
             try:
