@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
@@ -72,6 +72,11 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 # Import centralized language service
 from language_service import process_user_input, format_response_for_user, get_model_with_fallback
+from in_memory_vector_store import (
+    upsert_document as temp_upsert_document,
+    query_index as temp_query_index,
+    has_documents as temp_has_documents
+)
 
 # Import PDF RAG endpoint
 from pdf_rag_endpoint import router as pdf_rag_router
@@ -155,24 +160,18 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/upload")
-async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form(None)):
-    if not VECTOR_DB_AVAILABLE:
-        if flags.USE_PINECONE:
-            return JSONResponse(status_code=503, content={"error": "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"})
-        else:
-            error_msg = "ChromaDB is not available. "
-            try:
-                import chroma_service
-                if hasattr(chroma_service, 'chromadb_error') and chroma_service.chromadb_error:
-                    if "Python 3.14" in chroma_service.chromadb_error:
-                        error_msg += "ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12."
-                    else:
-                        error_msg += "Please install chromadb: pip install chromadb"
-                else:
-                    error_msg += "Please install chromadb: pip install chromadb"
-            except:
-                error_msg += "Please install chromadb: pip install chromadb"
-            return JSONResponse(status_code=503, content={"error": error_msg})
+async def upload_pdf(
+    request: Request,
+    file: UploadFile = File(...),
+    doc_url: Optional[str] = Form(None)
+):
+    temp_session_id = request.headers.get("x-temp-session-id")
+    if not temp_session_id:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Missing temporary session. Please open Analyze Documents again."}
+        )
+
     if not file.filename.lower().endswith('.pdf'):
         return JSONResponse(status_code=400, content={"error": "Only PDF files are supported."})
 
@@ -180,29 +179,13 @@ async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form
         # Read file content
         file_content = await file.read()
         
-        # Generate unique filename with timestamp
-        timestamp = int(time.time() * 1000)
-        safe_filename = file.filename.replace(" ", "-").replace("_", "-")
-        # Remove any path components for security
-        safe_filename = os.path.basename(safe_filename)
-        unique_filename = f"{os.path.splitext(safe_filename)[0]}-{timestamp}.pdf"
-        saved_file_path = UPLOADS_DIR / unique_filename
-        
-        # Save uploaded file permanently
-        with open(saved_file_path, "wb") as f:
-            f.write(file_content)
-        print(f"[upload] Saved PDF to: {saved_file_path}")
-        
         # Also save to temporary location for pymupdf processing
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
             tmp.write(file_content)
             tmp_path = tmp.name
 
-        # Generate the URL for accessing the PDF
-        pdf_url = f"http://localhost:8000/uploads/{unique_filename}"
-        
-        # Use provided doc_url or generated PDF URL
-        final_doc_url = doc_url if doc_url else pdf_url
+        # Temporary upload source metadata
+        final_doc_url = doc_url if doc_url else f"temp://{file.filename}"
 
         doc = fitz.open(tmp_path)
         total_chunks = 0
@@ -214,24 +197,25 @@ async def upload_pdf(file: UploadFile = File(...), doc_url: Optional[str] = Form
             text = "\n".join(doc.load_page(i).get_text("text") or "" for i in range(start, end))
             if text.strip():
                 print(f"Upserting batch for pages {start+1}-{end}...")
-                num = await upsert_document(
+                num = await temp_upsert_document(
                     text,
                     metadata={
                         "doc_name": file.filename,
                         "doc_url": final_doc_url  # Use provided URL or generated PDF URL
                     },
-                    chunk_offset=total_chunks
+                    chunk_offset=total_chunks,
+                    namespace=temp_session_id
                 )
                 total_chunks += num
                 print(f"Batch upserted: {num} chunks (total so far: {total_chunks})")
         doc.close()
         os.remove(tmp_path)
-        
-        storage_info = "Pinecone" if flags.USE_PINECONE else "ChromaDB (stored locally in ./chroma_db)"
+
         return {
-            "message": f"PDF uploaded and {total_chunks} chunks upserted to {storage_info}.",
+            "message": f"PDF uploaded and {total_chunks} chunks added to temporary session storage.",
             "doc_url": final_doc_url,
-            "filename": unique_filename
+            "filename": file.filename,
+            "temporary": True
         }
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -312,7 +296,7 @@ async def transcribe_endpoint(
 
 
 @app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(chat_request: ChatRequest, request: Request):
     """
     Multilingual Chat Endpoint
     
@@ -364,24 +348,6 @@ async def chat_endpoint(request: ChatRequest):
     - Hinglish/phonetic input ("computer kya hai")
     - Both Pinecone + API and ChromaDB + Local Model modes
     """
-    if not VECTOR_DB_AVAILABLE:
-        if flags.USE_PINECONE:
-            return JSONResponse(status_code=503, content={"error": "Pinecone is not available. Please check PINECONE_API_KEY, PINECONE_ENVIRONMENT, and PINECONE_INDEX_NAME in .env"})
-        else:
-            error_msg = "ChromaDB is not available. "
-            try:
-                import chroma_service
-                if hasattr(chroma_service, 'chromadb_error') and chroma_service.chromadb_error:
-                    if "Python 3.14" in chroma_service.chromadb_error:
-                        error_msg += "ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12."
-                    else:
-                        error_msg += "Please install chromadb: pip install chromadb"
-                else:
-                    error_msg += "Please install chromadb: pip install chromadb"
-            except:
-                error_msg += "Please install chromadb: pip install chromadb"
-            return JSONResponse(status_code=503, content={"error": error_msg})
-    
     try:
         # ====================================================================
         # LANGUAGE PROCESSING PIPELINE
@@ -390,12 +356,13 @@ async def chat_endpoint(request: ChatRequest):
         # - Handles native script (Hindi/Marathi) → English
         # - Handles Hinglish/phonetic ("computer kya hai") → "What is a computer?"
         # - User's original input is preserved in frontend (not modified here)
-        user_language = request.language or "en"
+        user_language = chat_request.language or "en"
+        temp_session_id = request.headers.get("x-temp-session-id")
         
-        print(f"[chat] User input (language={user_language}): {request.question[:100]}...")
+        print(f"[chat] User input (language={user_language}): {chat_request.question[:100]}...")
         
         # Normalize to English for processing (handles both native script and Hinglish)
-        question_for_processing = await process_user_input(request.question, user_language)
+        question_for_processing = await process_user_input(chat_request.question, user_language)
         
         print(f"[chat] Normalized to English for processing: {question_for_processing[:100]}...")
         
@@ -405,14 +372,28 @@ async def chat_endpoint(request: ChatRequest):
         # [POINT 8] TOP 15 CANDIDATES RETRIEVED (top_k=5 * 3 = 15)
         # [POINT 9] RERANKING DONE INSIDE query_index()
         print(f"[chat] Starting vector search...")
-        try:
-            matches = await query_index(question_for_processing, top_k=5, return_metadata=True)
-            print(f"[chat] Vector search completed. Found {len(matches)} matches")
-        except Exception as e:
-            print(f"[chat] ERROR in vector search: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
+        persistent_matches = []
+        temp_matches = []
+
+        if VECTOR_DB_AVAILABLE:
+            try:
+                persistent_matches = await query_index(question_for_processing, top_k=5, return_metadata=True)
+            except Exception as e:
+                print(f"[chat] ERROR in persistent vector search: {e}")
+
+        if temp_session_id and temp_has_documents(temp_session_id):
+            try:
+                temp_matches = await temp_query_index(
+                    question_for_processing,
+                    top_k=5,
+                    return_metadata=True,
+                    namespace=temp_session_id
+                )
+            except Exception as e:
+                print(f"[chat] ERROR in temporary vector search: {e}")
+
+        matches = [*persistent_matches, *temp_matches]
+        print(f"[chat] Vector search completed. Found {len(matches)} matches (persistent={len(persistent_matches)}, temporary={len(temp_matches)})")
         
         if not matches:
             print(f"[chat] WARNING: No matches found in vector search")
@@ -423,8 +404,8 @@ async def chat_endpoint(request: ChatRequest):
 
         # Format chat history for prompt (history is in user's language, but LLM can handle it)
         history_str = ""
-        if request.history:
-            for msg in request.history:
+        if chat_request.history:
+            for msg in chat_request.history:
                 role = "User" if msg.sender == "user" else "Bot"
                 history_str += f"{role}: {msg.text}\n"
         if history_str:

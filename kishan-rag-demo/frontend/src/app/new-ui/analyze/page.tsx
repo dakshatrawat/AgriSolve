@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getOrCreateTempSessionId } from "@/lib/tempSession";
 
 interface UploadedDoc {
   id: string;
@@ -14,6 +15,7 @@ interface UploadedDoc {
 
 export default function NewUIAnalyze() {
   const router = useRouter();
+  const tempSessionId = getOrCreateTempSessionId();
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -47,6 +49,7 @@ export default function NewUIAnalyze() {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "http://localhost:8000/api/upload");
+        xhr.setRequestHeader("x-temp-session-id", tempSessionId);
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -291,7 +294,7 @@ export default function NewUIAnalyze() {
                 check_circle
               </span>
               <p className="text-sm text-green-700 dark:text-[#2bee3b]">
-                Document uploaded successfully! Add more or proceed to chat.
+                Document uploaded successfully! It is available temporarily for this session and resets on full page refresh.
               </p>
             </div>
           )}

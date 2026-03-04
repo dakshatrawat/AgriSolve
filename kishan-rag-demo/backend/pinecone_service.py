@@ -25,6 +25,9 @@ load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
+PINECONE_DIMENSION = int(os.getenv("PINECONE_DIMENSION", "384"))
+PINECONE_METRIC = os.getenv("PINECONE_METRIC", "cosine")
 
 # Validate environment variables
 if not PINECONE_API_KEY:
@@ -40,10 +43,20 @@ print(f"[pinecone_service] Environment: {PINECONE_ENVIRONMENT}")
 print(f"[pinecone_service] Index Name: {PINECONE_INDEX_NAME}")
 
 # Parse environment for cloud/region
-if PINECONE_ENVIRONMENT and "-" in PINECONE_ENVIRONMENT:
-    cloud, region = PINECONE_ENVIRONMENT.split("-", 1)
+# Supports both formats:
+# 1) aws-us-east-1  -> cloud=aws, region=us-east-1
+# 2) us-east-1      -> cloud from PINECONE_CLOUD (default aws), region=us-east-1
+env_value = (PINECONE_ENVIRONMENT or "").strip()
+if env_value.startswith("aws-"):
+    cloud, region = "aws", env_value[len("aws-"):]
+elif env_value.startswith("gcp-"):
+    cloud, region = "gcp", env_value[len("gcp-"):]
+elif env_value.startswith("azure-"):
+    cloud, region = "azure", env_value[len("azure-"):]
+elif env_value:
+    cloud, region = PINECONE_CLOUD, env_value
 else:
-    cloud, region = "aws", "us-east-1"
+    cloud, region = PINECONE_CLOUD, "us-east-1"
 
 print(f"[pinecone_service] Cloud: {cloud}, Region: {region}")
 
@@ -55,16 +68,22 @@ except Exception as e:
     raise
 
 
-# Embedding model: 384-dim to match Pinecone index
-EMBED_MODEL_NAME = "all-MiniLM-L6-v2"  # 384 dimensions
-INDEX_DIM = 384
+# Embedding model: must match Pinecone index dimension
+EMBED_MODEL_NAME = os.getenv("PINECONE_EMBED_MODEL", "all-MiniLM-L6-v2")
+INDEX_DIM = PINECONE_DIMENSION
 # Bi-Encoder for fast retrieval
 model = SentenceTransformer(EMBED_MODEL_NAME)
 # Log embedding dimension at startup for sanity
 try:
-    print(f"[pinecone_service] Embedding model: {EMBED_MODEL_NAME}, dim={model.get_sentence_embedding_dimension()}")
+    model_dim = model.get_sentence_embedding_dimension()
+    print(f"[pinecone_service] Embedding model: {EMBED_MODEL_NAME}, dim={model_dim}")
+    if model_dim != INDEX_DIM:
+        raise ValueError(
+            f"Embedding dimension mismatch: model dim={model_dim}, PINECONE_DIMENSION={INDEX_DIM}. "
+            f"Update PINECONE_EMBED_MODEL or PINECONE_DIMENSION to match."
+        )
 except Exception:
-    pass
+    raise
 # Cross-Encoder for re-ranking
 cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
 
@@ -85,7 +104,7 @@ def get_or_create_index():
             pc.create_index(
                 name=PINECONE_INDEX_NAME,
                 dimension=INDEX_DIM,
-                metric="cosine",
+                metric=PINECONE_METRIC,
                 spec=ServerlessSpec(cloud=cloud, region=region)
             )
             print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' created successfully")

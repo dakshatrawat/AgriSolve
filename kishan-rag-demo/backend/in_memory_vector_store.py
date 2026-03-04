@@ -35,12 +35,24 @@ text_splitter = RecursiveCharacterTextSplitter(
     chunk_overlap=50
 )
 
-# In-memory storage
-_documents: List[Dict] = []
-_embeddings: List[np.ndarray] = []
+# In-memory storage (namespace/session scoped)
+_documents_by_namespace: Dict[str, List[Dict]] = {}
+_embeddings_by_namespace: Dict[str, List[np.ndarray]] = {}
 
 
-async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
+def _get_namespace_store(namespace: str):
+    if namespace not in _documents_by_namespace:
+        _documents_by_namespace[namespace] = []
+        _embeddings_by_namespace[namespace] = []
+    return _documents_by_namespace[namespace], _embeddings_by_namespace[namespace]
+
+
+def has_documents(namespace: str) -> bool:
+    docs = _documents_by_namespace.get(namespace, [])
+    return len(docs) > 0
+
+
+async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0, namespace="default"):
     """
     Upsert document chunks into in-memory vector store
     Accept doc_name and doc_url in metadata
@@ -51,6 +63,8 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
     chunks = text_splitter.split_text(text)
     total_chunks = len(chunks)
     
+    documents, embeddings_store = _get_namespace_store(namespace)
+
     for batch_start in range(0, total_chunks, batch_size):
         batch_chunks = chunks[batch_start:batch_start+batch_size]
         embeddings = await run_in_threadpool(model.encode, batch_chunks)
@@ -68,23 +82,26 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
                 chunk_metadata["doc_url"] = doc_url
             
             # Store in memory
-            _documents.append({
+            documents.append({
                 "id": ids[i],
                 "text": chunk,
                 "metadata": chunk_metadata,
                 "embedding": emb
             })
-            _embeddings.append(emb)
+            embeddings_store.append(emb)
     
-    print(f"[memory_service] Stored {total_chunks} chunks in memory (total: {len(_documents)} chunks)")
+    print(f"[memory_service] Stored {total_chunks} chunks in memory namespace={namespace} (total: {len(documents)} chunks)")
     return total_chunks
 
 
-async def query_index(query, top_k=3, return_metadata=False):
+async def query_index(query, top_k=3, return_metadata=False, namespace="default"):
     """
     Query the in-memory vector store with cosine similarity
     """
-    if len(_documents) == 0:
+    documents = _documents_by_namespace.get(namespace, [])
+    embeddings_store = _embeddings_by_namespace.get(namespace, [])
+
+    if len(documents) == 0:
         return [] if not return_metadata else []
     
     model = get_model()  # Lazy load model
@@ -96,7 +113,7 @@ async def query_index(query, top_k=3, return_metadata=False):
     # Calculate cosine similarities
     def compute_similarities():
         similarities = []
-        for emb in _embeddings:
+        for emb in embeddings_store:
             # Cosine similarity
             dot_product = np.dot(query_emb, emb)
             norm_query = np.linalg.norm(query_emb)
@@ -112,7 +129,7 @@ async def query_index(query, top_k=3, return_metadata=False):
     
     matches = []
     for idx in top_indices:
-        doc = _documents[idx]
+        doc = documents[idx]
         if return_metadata:
             matches.append({
                 "metadata": doc["metadata"],

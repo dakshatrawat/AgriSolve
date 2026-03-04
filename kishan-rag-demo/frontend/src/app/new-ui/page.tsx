@@ -1,80 +1,59 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { MouseEvent, useState } from "react";
 
 export default function NewUILanding() {
   const router = useRouter();
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [websiteUrl, setWebsiteUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [scrapeResult, setScrapeResult] = useState<{
-    success: boolean;
-    message: string;
-    total_chunks_ingested?: number;
-  } | null>(null);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState("");
 
-  const handleScrapeAndIngest = async () => {
-    if (!websiteUrl.trim()) return;
-    
-    setIsLoading(true);
-    setScrapeResult(null);
-    
-    try {
-      const response = await fetch("http://localhost:8000/api/pdf-rag/scrape-and-ingest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: websiteUrl,
-          skip_image_pages: true,
-          extract_webpage_content: true,
-        }),
-      });
-      
-      const data = await response.json();
-      setScrapeResult(data);
-      
-      if (data.success) {
-        setTimeout(() => {
-          setShowLinkModal(false);
-          setWebsiteUrl("");
-          setScrapeResult(null);
-        }, 3000);
-      }
-    } catch (error) {
-      setScrapeResult({
-        success: false,
-        message: "Failed to connect to server. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
+  const handleScrollToFeatures = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const featuresSection = document.getElementById("features-section");
+    featuresSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleAdminLogin = () => {
+    if (
+      adminEmail === "dakshatrawat77@gmail.com" &&
+      adminPassword === "Dakshat@123"
+    ) {
+      setShowAdminModal(false);
+      setAdminEmail("");
+      setAdminPassword("");
+      setAdminError("");
+      router.push("/new-ui/admin");
+      return;
     }
+
+    setAdminError("Invalid admin email or password.");
   };
 
   return (
     <>
-      {/* Link Scrape Modal */}
-      {showLinkModal && (
+      {/* Admin Login Modal */}
+      {showAdminModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-[#111812] rounded-2xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-[#dbe6dc] dark:border-white/10">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-[#2bee3b]/10 rounded-xl flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[#2bee3b] text-2xl">link</span>
+                  <span className="material-symbols-outlined text-[#2bee3b] text-2xl">admin_panel_settings</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-[#111812] dark:text-white">Analyze Website</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Extract content from any webpage</p>
+                  <h3 className="text-xl font-bold text-[#111812] dark:text-white">Admin Login</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Enter admin credentials to continue</p>
                 </div>
               </div>
               <button
                 onClick={() => {
-                  setShowLinkModal(false);
-                  setWebsiteUrl("");
-                  setScrapeResult(null);
+                  setShowAdminModal(false);
+                  setAdminEmail("");
+                  setAdminPassword("");
+                  setAdminError("");
                 }}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
               >
@@ -85,56 +64,48 @@ export default function NewUILanding() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Website URL
+                  Admin Email
                 </label>
                 <input
-                  type="url"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://example.com/agriculture-guide"
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => {
+                    setAdminEmail(e.target.value);
+                    if (adminError) setAdminError("");
+                  }}
+                  placeholder="Enter admin email"
                   className="w-full px-4 py-3 rounded-xl border border-[#dbe6dc] dark:border-white/20 bg-white dark:bg-[#0a120b] text-[#111812] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2bee3b] focus:border-transparent transition-all"
-                  disabled={isLoading}
                 />
               </div>
-              
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                AgriSolve will scrape the webpage content and any linked PDFs, then add them to your knowledge base for intelligent Q&A.
-              </p>
-              
-              {scrapeResult && (
-                <div className={`p-4 rounded-xl ${scrapeResult.success ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'}`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`material-symbols-outlined ${scrapeResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                      {scrapeResult.success ? 'check_circle' : 'error'}
-                    </span>
-                    <p className={`text-sm font-medium ${scrapeResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-                      {scrapeResult.message}
-                    </p>
-                  </div>
-                  {scrapeResult.success && scrapeResult.total_chunks_ingested && (
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-1 ml-7">
-                      {scrapeResult.total_chunks_ingested} chunks added to knowledge base
-                    </p>
-                  )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => {
+                    setAdminPassword(e.target.value);
+                    if (adminError) setAdminError("");
+                  }}
+                  placeholder="Enter password"
+                  className="w-full px-4 py-3 rounded-xl border border-[#dbe6dc] dark:border-white/20 bg-white dark:bg-[#0a120b] text-[#111812] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2bee3b] focus:border-transparent transition-all"
+                />
+              </div>
+
+              {adminError && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <p className="text-sm text-red-700 dark:text-red-300">{adminError}</p>
                 </div>
               )}
               
               <button
-                onClick={handleScrapeAndIngest}
-                disabled={isLoading || !websiteUrl.trim()}
+                onClick={handleAdminLogin}
+                disabled={!adminEmail.trim() || !adminPassword.trim()}
                 className="w-full py-4 bg-[#2bee3b] text-[#111812] rounded-xl font-bold text-lg hover:bg-[#24c932] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isLoading ? (
-                  <>
-                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined">cloud_download</span>
-                    Scrape & Ingest
-                  </>
-                )}
+                <span className="material-symbols-outlined">login</span>
+                Login as Admin
               </button>
             </div>
           </div>
@@ -163,7 +134,8 @@ export default function NewUILanding() {
             </a>
             <a
               className="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-[#2bee3b] transition-colors"
-              href="#"
+              href="#features-section"
+              onClick={handleScrollToFeatures}
             >
               Features
             </a>
@@ -175,8 +147,11 @@ export default function NewUILanding() {
             </a>
           </div>
           <div className="flex items-center gap-4">
-            <button className="px-6 py-2.5 rounded-full bg-[#111812] dark:bg-white text-white dark:text-[#111812] text-sm font-bold transition-transform active:scale-95">
-              Sign In
+            <button
+              onClick={() => setShowAdminModal(true)}
+              className="px-6 py-2.5 rounded-full bg-[#111812] dark:bg-white text-white dark:text-[#111812] text-sm font-bold transition-transform active:scale-95"
+            >
+              Admin
             </button>
           </div>
         </div>
@@ -215,19 +190,12 @@ export default function NewUILanding() {
               <span className="material-symbols-outlined">upload_file</span>
               Analyze Documents
             </button>
-            <button
-              onClick={() => setShowLinkModal(true)}
-              className="w-full sm:w-auto px-10 py-5 bg-white/20 backdrop-blur-xl border border-white/40 text-white rounded-full text-lg font-bold hover:bg-white/30 transition-all flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined">link</span>
-              Analyze Website
-            </button>
           </div>
         </div>
       </header>
 
       {/* Features Section */}
-      <section className="py-24 px-6 max-w-7xl mx-auto w-full">
+      <section id="features-section" className="py-24 px-6 max-w-7xl mx-auto w-full">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-black mb-4">
             Empowering Modern Farmers
@@ -290,9 +258,6 @@ export default function NewUILanding() {
             Join progressive farmers who use AgriSolve to make data-driven
             decisions every day.
           </p>
-          <button className="px-12 py-5 bg-[#2bee3b] text-[#111812] rounded-full text-xl font-bold shadow-xl shadow-[#2bee3b]/20 hover:scale-105 transition-transform">
-            Create Free Account
-          </button>
         </div>
       </section>
 

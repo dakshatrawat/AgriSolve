@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
+import { getOrCreateTempSessionId } from "@/lib/tempSession";
 
 type Source = {
   text: string;
@@ -22,14 +23,9 @@ type Message = {
   timestamp?: string;
 };
 
-type ChatSession = {
-  id: string;
-  title: string;
-  date: string;
-};
-
 export default function NewUIChat() {
   const router = useRouter();
+  const tempSessionId = getOrCreateTempSessionId();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,23 +52,6 @@ export default function NewUIChat() {
 
   // Sidebar state
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
-  const [chatHistory, setChatHistory] = useState<ChatSession[]>([
-    {
-      id: "1",
-      title: "Soil Health Report Analysis",
-      date: "Today",
-    },
-    {
-      id: "2",
-      title: "Kharif Crop Planning",
-      date: "Yesterday",
-    },
-    {
-      id: "3",
-      title: "Pesticide Recommendation",
-      date: "2 days ago",
-    },
-  ]);
 
   const supportedLanguages = [
     { code: "en", name: "English" },
@@ -211,7 +190,10 @@ export default function NewUIChat() {
     try {
       const res = await fetch("http://localhost:8000/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-temp-session-id": tempSessionId,
+        },
         body: JSON.stringify({
           question,
           history,
@@ -355,50 +337,6 @@ export default function NewUIChat() {
             </div>
           </div>
 
-          {/* Chat History */}
-          <div>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
-              Chat History
-            </h3>
-            <div className="space-y-1">
-              {chatHistory.map((chat) => (
-                <div
-                  key={chat.id}
-                  className="group flex items-center gap-3 p-3 rounded-xl hover:bg-white/60 cursor-pointer transition-colors"
-                >
-                  <span className="material-symbols-outlined text-slate-400 text-lg">
-                    chat_bubble
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-700 truncate font-medium">
-                      {chat.title}
-                    </p>
-                    <p className="text-xs text-slate-400">{chat.date}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* User Profile - Fixed at bottom */}
-        <div className="p-6 border-t border-green-100 bg-white/40 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-full bg-slate-200 overflow-hidden flex-shrink-0">
-              <img
-                alt="User Profile"
-                className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuADBdMDiAW5XHWcifwk5sVx0cApffMdfI2TtT8NUZeaGpYPgVde1t5CqpQBFKYRu5qEFapWYeTswsv80tV2CKSP-GYATUyWEzSYcvPhN7ZTOFzsc62xZOg-hRuNyqur9c0Mh2XZXhB6l12gGkD5hGm8aZVs-gm5rLJfM-pqbo7z-FFEdDXr5hV1VWGywzNnqRYSl5T2gZbO4ISgPfdAh9yEJnnLl29kKX10SG0t-tVcoG62BodVDpm979lWCas8fZy7FBoEu_T5C6RL"
-              />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-slate-800">Farmer John</p>
-              <p className="text-xs text-slate-500">Premium Account</p>
-            </div>
-            <button className="text-slate-400 hover:text-slate-600">
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-          </div>
         </div>
       </aside>
 
