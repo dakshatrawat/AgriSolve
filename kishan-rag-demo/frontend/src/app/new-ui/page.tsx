@@ -16,6 +16,11 @@ export default function NewUILanding() {
     featuresSection?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const handleScrollToTop = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleAdminLogin = () => {
     if (
       adminEmail === "dakshatrawat77@gmail.com" &&
@@ -128,7 +133,8 @@ export default function NewUILanding() {
           <div className="hidden md:flex items-center gap-10">
             <a
               className="text-sm font-semibold hover:text-[#2bee3b] transition-colors"
-              href="#"
+              href="#top"
+              onClick={handleScrollToTop}
             >
               Home
             </a>
@@ -138,12 +144,6 @@ export default function NewUILanding() {
               onClick={handleScrollToFeatures}
             >
               Features
-            </a>
-            <a
-              className="text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-[#2bee3b] transition-colors"
-              href="#"
-            >
-              About
             </a>
           </div>
           <div className="flex items-center gap-4">
@@ -271,17 +271,6 @@ export default function NewUILanding() {
               </span>
             </div>
             <span className="text-xl font-black tracking-tight">AgriSolve</span>
-          </div>
-          <div className="flex gap-8 text-sm font-medium text-gray-500">
-            <a className="hover:text-[#2bee3b]" href="#">
-              Privacy Policy
-            </a>
-            <a className="hover:text-[#2bee3b]" href="#">
-              Terms of Service
-            </a>
-            <a className="hover:text-[#2bee3b]" href="#">
-              Contact Support
-            </a>
           </div>
           <p className="text-sm text-gray-400">
             © 2024 AgriSolve AI. All rights reserved.

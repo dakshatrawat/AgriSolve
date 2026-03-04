@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { getOrCreateTempSessionId } from "@/lib/tempSession";
 
@@ -25,15 +25,21 @@ type Message = {
 
 export default function NewUIChat() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tempSessionId = getOrCreateTempSessionId();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
+
+  const isDocsMode = searchParams.get("mode") === "docs";
+  const initialBotMessage = isDocsMode
+    ? "Hello! Ask me anything about your documents. I can help you analyze soil reports, crop schedules, or market trends. Please upload a document to get started."
+    : "Hello! Ask me about wheat and rice advisories or crop information. I provide guidance from official sources.";
 
   // Chat state
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "bot",
-      text: "Hello! Ask me anything about your documents. I can help you analyze soil reports, crop schedules, or market trends. Please upload a document to get started.",
+      text: initialBotMessage,
       timestamp: "9:41 AM",
     },
   ]);
@@ -346,17 +352,15 @@ export default function NewUIChat() {
         <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md flex items-center justify-between px-8 z-10">
           <div className="flex items-center gap-2">
             <span className="size-2 bg-green-700 rounded-full animate-pulse"></span>
-            <h2 className="font-semibold text-slate-800">Document Assistant</h2>
+            <h2 className="font-semibold text-slate-800">AI Agricultural Assistant</h2>
           </div>
           <div className="flex items-center gap-4">
-            <button className="text-slate-500 hover:text-slate-700 flex items-center gap-2 text-sm font-medium transition-colors">
-              <span className="material-symbols-outlined text-xl">share</span>
-              Share
-            </button>
-            <div className="h-6 w-px bg-slate-200"></div>
-            <button className="text-slate-500 hover:text-slate-700 transition-colors">
-              <span className="material-symbols-outlined">more_horiz</span>
-            </button>
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-green-50 text-green-700 border border-green-100">
+              Official Sources Enabled
+            </span>
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 uppercase">
+              {selectedLanguage}
+            </span>
           </div>
         </header>
 
@@ -548,98 +552,3 @@ export default function NewUIChat() {
     </div>
   );
 }
-
-const MessageBubble = ({
-  message,
-  isUser,
-}: {
-  message: Message;
-  isUser: boolean;
-}) => (
-  <div
-    className={`px-4 py-3 rounded-lg transition-all duration-200 ${
-      isUser
-        ? "bg-gradient-to-br from-[#2bee3b] to-[#24c932] text-[#111812] shadow-md"
-        : "bg-white dark:bg-[#152016] text-[#111812] dark:text-white border border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md"
-    }`}
-    translate="no"
-  >
-    {isUser ? (
-      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-        {message.text}
-      </p>
-    ) : (
-      <div className="prose prose-sm max-w-none prose-headings:text-gray-900 dark:prose-headings:text-white prose-p:text-gray-800 dark:prose-p:text-gray-200 prose-a:text-[#2bee3b] prose-strong:text-gray-900 dark:prose-strong:text-white prose-ul:text-gray-800 dark:prose-ul:text-gray-200 prose-ol:text-gray-800 dark:prose-ol:text-gray-200 prose-headings:my-2 prose-p:my-2 prose-li:my-1">
-        <ReactMarkdown>{message.text || "..."}</ReactMarkdown>
-      </div>
-    )}
-  </div>
-);
-
-const SourcesCard = ({
-  sources,
-  isExpanded,
-  onToggle,
-}: {
-  sources: Source[];
-  isExpanded: boolean;
-  onToggle: () => void;
-}) => {
-  if (!sources || sources.length === 0) return null;
-
-  return (
-    <div className="mt-3 animate-in fade-in duration-200">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="text-xs text-[#2bee3b] hover:text-[#24c932] font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#2bee3b]/20 rounded-md px-2 py-1 hover:bg-[#2bee3b]/10"
-      >
-        {isExpanded ? "− Hide Sources" : "+ Show Sources"}
-      </button>
-
-      {isExpanded && (
-        <div className="mt-2 p-4 bg-gradient-to-br from-gray-50 dark:from-[#0a120b] to-white dark:to-[#152016] rounded-lg border border-gray-200 dark:border-white/10 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[#2bee3b] text-xl">
-              description
-            </span>
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Retrieved Context
-            </h4>
-          </div>
-          <div className="space-y-3">
-            {sources.map((source: Source, idx: number) => (
-              <div
-                key={idx}
-                className="text-sm text-gray-700 dark:text-gray-300 pl-3 border-l-2 border-[#2bee3b]/30 hover:border-[#2bee3b] transition-colors"
-              >
-                <p className="italic mb-2 text-gray-600 dark:text-gray-400 leading-relaxed">
-                  "{source.text.substring(0, 200)}
-                  {source.text.length > 200 ? "..." : ""}"
-                </p>
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  {source.doc_name && (
-                    <span className="font-medium">{source.doc_name}</span>
-                  )}
-                  {source.doc_url && (
-                    <>
-                      <span>•</span>
-                      <a
-                        href={source.doc_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#2bee3b] hover:text-[#24c932] underline transition-colors"
-                      >
-                        View Document
-                      </a>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
