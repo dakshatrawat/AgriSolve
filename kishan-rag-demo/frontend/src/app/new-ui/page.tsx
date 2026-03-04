@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { API_URL } from "@/config";
 
 export default function NewUILanding() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function NewUILanding() {
     setScrapeResult(null);
     
     try {
-      const response = await fetch("http://localhost:8000/api/pdf-rag/scrape-and-ingest", {
+      const response = await fetch(`${API_URL}/api/pdf-rag/scrape-and-ingest`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

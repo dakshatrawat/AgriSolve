@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
+import { API_URL } from "@/config";
 
 type Source = {
   text: string;
@@ -169,7 +170,7 @@ export default function NewUIChat() {
       formData.append("audio", file);
       formData.append("language", selectedLanguage);
 
-      const res = await fetch("http://localhost:8000/api/transcribe", {
+      const res = await fetch(`${API_URL}/api/transcribe`, {
         method: "POST",
         body: formData,
       });
@@ -209,7 +210,7 @@ export default function NewUIChat() {
     const history = messages.slice(-6);
 
     try {
-      const res = await fetch("http://localhost:8000/api/chat", {
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

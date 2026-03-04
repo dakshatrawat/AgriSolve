@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { API_URL } from "@/config";
 
 interface UploadedDoc {
   id: string;
@@ -46,7 +47,7 @@ export default function NewUIAnalyze() {
     try {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "http://localhost:8000/api/upload");
+        xhr.open("POST", `${API_URL}/api/upload`);
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
