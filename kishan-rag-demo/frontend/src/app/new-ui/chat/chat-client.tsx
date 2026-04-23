@@ -48,7 +48,12 @@ export default function NewUIChatClient() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Open sidebar by default on desktop
+  useEffect(() => {
+    if (window.innerWidth >= 768) setSidebarOpen(true);
+  }, []);
 
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error) return error.message;
@@ -216,9 +221,13 @@ export default function NewUIChatClient() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-white dark:bg-[#0f0f0f]">
+    <div className="flex h-screen w-full bg-white dark:bg-[#0f0f0f] relative">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/40 z-20 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? "w-64" : "w-0"} bg-gray-50 dark:bg-[#141414] border-r border-gray-200 dark:border-neutral-800 flex flex-col shrink-0 h-screen overflow-hidden transition-all duration-200`}>
+      <aside className={`${sidebarOpen ? "w-64 translate-x-0" : "w-0 -translate-x-full md:translate-x-0"} fixed md:relative z-30 md:z-auto bg-gray-50 dark:bg-[#141414] border-r border-gray-200 dark:border-neutral-800 flex flex-col shrink-0 h-screen overflow-hidden transition-all duration-200`}>
         <div className="px-5 py-4 border-b border-gray-200 dark:border-neutral-800 shrink-0">
           <div className="flex items-center gap-2.5">
             <button onClick={() => router.push("/new-ui")} className="w-8 h-8 bg-gray-900 dark:bg-white rounded-lg flex items-center justify-center text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors">
@@ -266,24 +275,24 @@ export default function NewUIChatClient() {
 
       {/* Main Chat */}
       <main className="flex-1 flex flex-col relative bg-white dark:bg-[#0f0f0f]">
-        <header className="h-14 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#0f0f0f] flex items-center justify-between px-5 z-10 shrink-0">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors">
+        <header className="h-14 border-b border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#0f0f0f] flex items-center justify-between px-3 sm:px-5 z-10 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors shrink-0">
               <span className="material-symbols-outlined text-gray-500 dark:text-gray-400 text-xl">{sidebarOpen ? "menu_open" : "menu"}</span>
             </button>
-            <div className="h-5 w-px bg-gray-200 dark:bg-neutral-700" />
-            <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">Agricultural Assistant</h2>
+            <div className="h-5 w-px bg-gray-200 dark:bg-neutral-700 hidden sm:block" />
+            <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate hidden sm:block">Agricultural Assistant</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">RAG Active</span>
-            <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-neutral-700 uppercase">{selectedLanguage}</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <span className="text-[10px] sm:text-xs font-medium px-1.5 sm:px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">RAG</span>
+            <span className="text-[10px] sm:text-xs font-medium px-1.5 sm:px-2.5 py-1 rounded-md bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-neutral-700 uppercase">{selectedLanguage}</span>
             <ThemeToggle />
           </div>
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-6">
-          <div className="max-w-3xl mx-auto space-y-5">
+        <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 sm:py-6">
+          <div className="max-w-3xl mx-auto space-y-4 sm:space-y-5">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex gap-3 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
@@ -293,7 +302,7 @@ export default function NewUIChatClient() {
                 }`}>
                   <span className="material-symbols-outlined text-base">{msg.sender === "user" ? "person" : "smart_toy"}</span>
                 </div>
-                <div className={`space-y-1 max-w-2xl ${msg.sender === "user" ? "text-right" : ""}`}>
+                <div className={`space-y-1 max-w-[calc(100%-3rem)] sm:max-w-2xl ${msg.sender === "user" ? "text-right" : ""}`}>
                   <div className={`px-4 py-3 rounded-xl text-sm leading-relaxed ${
                     msg.sender === "user"
                       ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-tr-sm"
@@ -362,7 +371,7 @@ export default function NewUIChatClient() {
         </div>
 
         {/* Input */}
-        <div className="px-5 pb-5 pt-3 z-10 border-t border-gray-100 dark:border-neutral-800">
+        <div className="px-3 sm:px-5 pb-3 sm:pb-5 pt-3 z-10 border-t border-gray-100 dark:border-neutral-800">
           <div className="max-w-3xl mx-auto">
             <div className="bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-neutral-700 rounded-xl p-1.5 flex items-center gap-1.5 focus-within:border-gray-400 dark:focus-within:border-neutral-600 focus-within:ring-1 focus-within:ring-gray-200 dark:focus-within:ring-neutral-700 transition-all">
               <button

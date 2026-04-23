@@ -94,28 +94,31 @@ export default function AdminPage() {
 
       {/* Nav */}
       <nav className="sticky top-0 z-[100] w-full bg-white/90 dark:bg-[#0f0f0f]/90 backdrop-blur-md border-b border-gray-200 dark:border-neutral-800">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gray-900 dark:bg-white rounded-lg flex items-center justify-center">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 bg-gray-900 dark:bg-white rounded-lg flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-white dark:text-gray-900 text-lg">eco</span>
             </div>
             <span className="text-sm font-bold tracking-tight text-gray-900 dark:text-gray-100">AgriSolve</span>
-            <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-neutral-700 uppercase tracking-wider">Admin</span>
+            <span className="ml-1 sm:ml-2 text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded bg-gray-100 dark:bg-neutral-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-neutral-700 uppercase tracking-wider">Admin</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />
-            <button onClick={() => router.push("/new-ui")} className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Back to home</button>
+            <button onClick={() => router.push("/new-ui")} className="p-1.5 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors sm:hidden">
+              <span className="material-symbols-outlined text-gray-500 dark:text-gray-400 text-xl">arrow_back</span>
+            </button>
+            <button onClick={() => router.push("/new-ui")} className="hidden sm:inline-flex text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Back to home</button>
           </div>
         </div>
       </nav>
 
       {/* Content */}
-      <main className="px-6 py-10">
-        <div className="max-w-5xl mx-auto space-y-6">
-          <section className="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1a1a1a] p-8">
-            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <main className="px-4 sm:px-6 py-6 sm:py-10">
+        <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6">
+          <section className="rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#1a1a1a] p-5 sm:p-8">
+            <div className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
               <div className="max-w-lg">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50 mb-2">Knowledge Base Management</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50 mb-2">Knowledge Base Management</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                   Add verified agricultural sources to the knowledge base. Content is scraped, chunked, embedded, and made available for RAG retrieval.
                 </p>

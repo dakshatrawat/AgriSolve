@@ -10,6 +10,7 @@ export default function NewUILanding() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminError, setAdminError] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleScrollToFeatures = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
@@ -112,30 +113,49 @@ export default function NewUILanding() {
               <ThemeToggle />
               <button
                 onClick={() => setShowAdminModal(true)}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-neutral-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                className="hidden sm:inline-flex px-4 py-2 rounded-lg border border-gray-300 dark:border-neutral-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Admin
+              </button>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined text-gray-700 dark:text-gray-300 text-xl">{mobileMenuOpen ? "close" : "menu"}</span>
+              </button>
+            </div>
+          </div>
+          {/* Mobile menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-gray-200 dark:border-neutral-800 px-6 py-3 flex flex-col gap-2 bg-white dark:bg-[#0f0f0f]">
+              <a className="text-sm font-medium text-gray-900 dark:text-gray-100 py-2" href="#top" onClick={(e) => { handleScrollToTop(e); setMobileMenuOpen(false); }}>Home</a>
+              <a className="text-sm font-medium text-gray-500 dark:text-gray-400 py-2" href="#features-section" onClick={(e) => { handleScrollToFeatures(e); setMobileMenuOpen(false); }}>Features</a>
+              <button
+                onClick={() => { setShowAdminModal(true); setMobileMenuOpen(false); }}
+                className="text-left text-sm font-medium text-gray-500 dark:text-gray-400 py-2"
               >
                 Admin
               </button>
             </div>
-          </div>
+          )}
         </nav>
 
         {/* Hero */}
-        <header className="relative w-full py-24 md:py-32 flex items-center justify-center bg-gray-50 dark:bg-[#111111] border-b border-gray-200 dark:border-neutral-800">
+        <header className="relative w-full py-16 sm:py-24 md:py-32 flex items-center justify-center bg-gray-50 dark:bg-[#111111] border-b border-gray-200 dark:border-neutral-800">
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-50 dark:bg-blue-900/20 rounded-full blur-3xl opacity-60" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-50 dark:bg-emerald-900/20 rounded-full blur-3xl opacity-60" />
+            <div className="absolute top-0 left-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-blue-50 dark:bg-blue-900/20 rounded-full blur-3xl opacity-60" />
+            <div className="absolute bottom-0 right-1/4 w-64 sm:w-96 h-64 sm:h-96 bg-emerald-50 dark:bg-emerald-900/20 rounded-full blur-3xl opacity-60" />
           </div>
-          <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+          <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-full text-xs font-medium text-gray-600 dark:text-gray-300 mb-6">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
               AI-Powered Agricultural Intelligence
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-50 leading-tight tracking-tight mb-5">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-50 leading-tight tracking-tight mb-5">
               Smarter decisions for
               <br />modern agriculture
             </h1>
-            <p className="text-lg text-gray-500 dark:text-gray-400 mb-10 max-w-xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg text-gray-500 dark:text-gray-400 mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed">
               Analyze soil reports, process crop documents, and get real-time expert advice powered by RAG and multilingual AI.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
