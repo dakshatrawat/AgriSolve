@@ -69,12 +69,7 @@ elif flags.USE_CHROMADB:
             if "Python 3.14" in error_str:
                 raise Exception("ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12.")
             raise Exception("ChromaDB is not available. Please install chromadb: pip install chromadb")
-try:
-    from audio_service import transcribe_audio
-    AUDIO_AVAILABLE = True
-except ImportError:
-    AUDIO_AVAILABLE = False
-    print("[app] Audio transcription not available (missing dependencies)")
+from audio_service import transcribe_audio
 import google.generativeai as genai
 # NOTE: torch and transformers are imported lazily in get_local_llm() to avoid OOM on Render
 # Import centralized language service
@@ -281,8 +276,6 @@ async def transcribe_endpoint(
     audio: UploadFile = File(...),
     language: str = Form(None)
 ):
-    if not AUDIO_AVAILABLE:
-        return JSONResponse(status_code=503, content={"error": "Audio transcription not available on this deployment", "success": False})
     try:
         result = await transcribe_audio(audio, language)
         return JSONResponse(content={
