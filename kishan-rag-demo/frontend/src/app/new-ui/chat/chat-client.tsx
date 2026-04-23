@@ -50,6 +50,12 @@ export default function NewUIChatClient() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    return "Unexpected error";
+  };
+
   const supportedLanguages = [
     { code: "en", name: "English" },
     { code: "hi", name: "Hindi", native: "हिन्दी" },
@@ -102,8 +108,8 @@ export default function NewUIChatClient() {
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
-    } catch (err: any) {
-      console.error("Microphone error:", err);
+    } catch (error: unknown) {
+      console.error("Microphone error:", error);
       alert("Microphone access denied. Please allow microphone access.");
     }
   };
@@ -128,8 +134,8 @@ export default function NewUIChatClient() {
       const data = await res.json();
       if (data.success && data.text) setInput(data.text);
       else throw new Error(data.error || "Transcription failed");
-    } catch (err: any) {
-      console.error("Audio transcription error:", err);
+    } catch (error: unknown) {
+      console.error("Audio transcription error:", error);
       alert("Could not transcribe audio. Please try again.");
     } finally {
       setIsTranscribing(false);
@@ -201,8 +207,8 @@ export default function NewUIChatClient() {
         if (idx !== -1) updated[idx] = { ...updated[idx], text: botMsg, sources };
         return updated;
       });
-    } catch (err: any) {
-      console.error("Chat error:", err);
+    } catch (error: unknown) {
+      console.error("Chat error:", error);
       setMessages((msgs) => [...msgs, { sender: "bot", text: "Sorry, I couldn't process your request. Please try again.", timestamp: getTimestamp() }]);
     } finally {
       setSending(false);
@@ -370,7 +376,11 @@ export default function NewUIChatClient() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSend(e as any)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    void handleSend(e);
+                  }
+                }}
                 disabled={sending || isRecording || isTranscribing}
                 className="flex-1 bg-transparent border-none focus:ring-0 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-neutral-500 text-sm py-2 outline-none disabled:opacity-50"
                 placeholder={isTranscribing ? "Transcribing..." : "Ask a question..."}

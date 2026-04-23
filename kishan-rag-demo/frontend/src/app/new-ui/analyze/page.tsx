@@ -24,6 +24,12 @@ export default function NewUIAnalyze() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([]);
 
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    return "Failed to upload file";
+  };
+
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setUploadError(null);
@@ -59,8 +65,8 @@ export default function NewUIAnalyze() {
         xhr.onerror = () => { setUploadError("Failed to upload file"); reject(new Error("Failed to upload file")); };
         xhr.send(formData);
       });
-    } catch (err: any) {
-      setUploadError(err.message || "Failed to upload file");
+    } catch (error: unknown) {
+      setUploadError(getErrorMessage(error));
     } finally {
       setUploading(false);
       setUploadProgress(0);
