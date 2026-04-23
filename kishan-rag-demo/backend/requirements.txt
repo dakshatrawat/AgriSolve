@@ -2,7 +2,6 @@ fastapi
 uvicorn
 python-dotenv
 pydantic
-chromadb
 pinecone
 langchain
 langchain-text-splitters
@@ -12,11 +11,4 @@ beautifulsoup4
 pymupdf
 google-generativeai
 python-multipart
-# Audio transcription
-transformers
-torch
-accelerate  # Required for torch device_map
 numpy
-librosa
-soundfile
-resampy  # Required for librosa.resample()

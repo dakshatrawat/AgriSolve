@@ -69,7 +69,12 @@ elif flags.USE_CHROMADB:
             if "Python 3.14" in error_str:
                 raise Exception("ChromaDB is not compatible with Python 3.14. Please use Python 3.11 or 3.12.")
             raise Exception("ChromaDB is not available. Please install chromadb: pip install chromadb")
-from audio_service import transcribe_audio
+try:
+    from audio_service import transcribe_audio
+    AUDIO_AVAILABLE = True
+except ImportError:
+    AUDIO_AVAILABLE = False
+    print("[app] Audio transcription not available (missing dependencies)")
 import google.generativeai as genai
 # NOTE: torch and transformers are imported lazily in get_local_llm() to avoid OOM on Render
 # Import centralized language service
@@ -276,16 +281,8 @@ async def transcribe_endpoint(
     audio: UploadFile = File(...),
     language: str = Form(None)
 ):
-    """
-    Transcribe audio to text
-    
-    Args:
-        audio: Audio file (wav, mp3, m4a, etc.)
-        language: Optional language code (hi, en, mr) for forced language detection
-    
-    Returns:
-        JSON with 'text' and 'language' fields
-    """
+    if not AUDIO_AVAILABLE:
+        return JSONResponse(status_code=503, content={"error": "Audio transcription not available on this deployment", "success": False})
     try:
         result = await transcribe_audio(audio, language)
         return JSONResponse(content={
@@ -500,12 +497,18 @@ async def chat_endpoint(chat_request: ChatRequest, request: Request):
                 else:
                     print("[chat] Gemini API error, falling back to local model...")
                 
-                # Fallback to local model
+                # Fallback to local model (not available on Render deployment)
                 try:
                     from fastapi.concurrency import run_in_threadpool
                     import asyncio
-                    
-                    tokenizer, model = get_local_llm()
+
+                    try:
+                        tokenizer, model = get_local_llm()
+                    except Exception:
+                        return JSONResponse(
+                            status_code=503,
+                            content={"error": f"Gemini API failed: {str(gemini_error)}. Local model fallback not available on this deployment."}
+                        )
                     
                     # Format prompt for TinyLlama chat format (using English question)
                     chat_prompt = f"<|system|>\n{prompt}</s>\n<|user|>\n{question_for_processing}</s>\n<|assistant|>\n"
