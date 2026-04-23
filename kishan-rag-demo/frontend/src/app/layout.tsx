@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { ThemeProvider } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,7 +19,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AgriSolve - Modern Agricultural Assistant",
+  title: "AgriSolve - Agricultural Intelligence Platform",
   description:
     "AI-powered agricultural assistant for soil analysis, document processing, and expert advice",
 };
@@ -29,18 +30,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" translate="no" className="light">
+    <html lang="en" translate="no" suppressHydrationWarning>
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
           rel="stylesheet"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('agrisolve-theme');
+                  if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  document.documentElement.classList.add(theme);
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body
-        className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased font-display bg-white dark:bg-[#0a120b] text-[#111812] dark:text-white`}
+        className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased font-display bg-white dark:bg-[#0f0f0f] text-gray-900 dark:text-gray-100`}
         translate="no"
       >
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
