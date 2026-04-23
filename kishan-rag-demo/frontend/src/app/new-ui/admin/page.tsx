@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/lib/ThemeToggle";
+import { API_URL } from "@/lib/api";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function AdminPage() {
     setIsLoading(true);
     setScrapeResult(null);
     try {
-      const response = await fetch("http://localhost:8000/api/pdf-rag/scrape-and-ingest", {
+      const response = await fetch(`${API_URL}/api/pdf-rag/scrape-and-ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: websiteUrl, skip_image_pages: true, extract_webpage_content: true }),

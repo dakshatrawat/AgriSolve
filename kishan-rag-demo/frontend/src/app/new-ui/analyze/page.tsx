@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getOrCreateTempSessionId } from "@/lib/tempSession";
 import ThemeToggle from "@/lib/ThemeToggle";
+import { API_URL } from "@/lib/api";
 
 interface UploadedDoc {
   id: string;
@@ -38,7 +39,7 @@ export default function NewUIAnalyze() {
     try {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "http://localhost:8000/api/upload");
+        xhr.open("POST", `${API_URL}/api/upload`);
         xhr.setRequestHeader("x-temp-session-id", tempSessionId);
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) setUploadProgress(Math.round((event.loaded / event.total) * 100));
