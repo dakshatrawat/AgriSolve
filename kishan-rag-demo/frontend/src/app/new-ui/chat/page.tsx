@@ -143,7 +143,12 @@ export default function NewUIChat() {
     const question = input.trim();
     const timestamp = getTimestamp();
     setInput("");
-    setMessages((msgs) => [...msgs, { sender: "user", text: question, timestamp }]);
+    const botTimestamp = getTimestamp();
+    setMessages((msgs) => [
+      ...msgs,
+      { sender: "user", text: question, timestamp },
+      { sender: "bot", text: "", timestamp: botTimestamp },
+    ]);
     const history = messages.slice(-6);
 
     try {
@@ -158,8 +163,6 @@ export default function NewUIChat() {
       const decoder = new TextDecoder();
       let done = false, botMsg = "", buffer = "";
       let sources: Source[] | undefined;
-      const botTimestamp = getTimestamp();
-      setMessages((msgs) => [...msgs, { sender: "bot", text: "", timestamp: botTimestamp }]);
 
       const appendCharByChar = async (text: string) => {
         for (let i = 0; i < text.length; i++) {
