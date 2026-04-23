@@ -12,9 +12,3 @@ pymupdf
 google-generativeai
 python-multipart
 numpy
-# Audio transcription (Whisper)
-transformers
-torch
-librosa
-soundfile
-resampy

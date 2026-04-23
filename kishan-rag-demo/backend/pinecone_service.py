@@ -71,21 +71,32 @@ except Exception as e:
 # Embedding model: must match Pinecone index dimension
 EMBED_MODEL_NAME = os.getenv("PINECONE_EMBED_MODEL", "all-MiniLM-L6-v2")
 INDEX_DIM = PINECONE_DIMENSION
-# Bi-Encoder for fast retrieval
-model = SentenceTransformer(EMBED_MODEL_NAME)
-# Log embedding dimension at startup for sanity
-try:
-    model_dim = model.get_sentence_embedding_dimension()
-    print(f"[pinecone_service] Embedding model: {EMBED_MODEL_NAME}, dim={model_dim}")
-    if model_dim != INDEX_DIM:
-        raise ValueError(
-            f"Embedding dimension mismatch: model dim={model_dim}, PINECONE_DIMENSION={INDEX_DIM}. "
-            f"Update PINECONE_EMBED_MODEL or PINECONE_DIMENSION to match."
-        )
-except Exception:
-    raise
-# Cross-Encoder for re-ranking
-cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
+# Lazy-loaded models (loaded on first request to avoid OOM at startup)
+_embed_model = None
+_cross_encoder = None
+
+def get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        print(f"[pinecone_service] Loading embedding model: {EMBED_MODEL_NAME}...")
+        _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
+        model_dim = _embed_model.get_sentence_embedding_dimension()
+        print(f"[pinecone_service] Embedding model loaded, dim={model_dim}")
+        if model_dim != INDEX_DIM:
+            raise ValueError(
+                f"Embedding dimension mismatch: model dim={model_dim}, PINECONE_DIMENSION={INDEX_DIM}. "
+                f"Update PINECONE_EMBED_MODEL or PINECONE_DIMENSION to match."
+            )
+    return _embed_model
+
+def get_cross_encoder():
+    global _cross_encoder
+    if _cross_encoder is None:
+        print(f"[pinecone_service] Loading cross-encoder model...")
+        _cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+        print(f"[pinecone_service] Cross-encoder loaded")
+    return _cross_encoder
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=500,
@@ -153,7 +164,7 @@ async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
         batch_num = (batch_start // batch_size) + 1
         print(f"[pinecone_service] Processing batch {batch_num}/{(total_chunks + batch_size - 1) // batch_size}: chunks {batch_start}-{batch_start + len(batch_chunks) - 1}")
         
-        embeddings = await run_in_threadpool(model.encode, batch_chunks)
+        embeddings = await run_in_threadpool(get_embed_model().encode, batch_chunks)
         embeddings = embeddings.tolist()
         
         ids = [f"chunk-{chunk_offset + batch_start + i}" for i in range(len(batch_chunks))]
@@ -211,7 +222,7 @@ async def query_index(query, top_k=3, return_metadata=False):
     candidate_k = top_k * 3
     print(f"[pinecone_service] Step 1: Retrieving {candidate_k} candidates from Pinecone...")
     
-    query_emb = await run_in_threadpool(model.encode, [query])
+    query_emb = await run_in_threadpool(get_embed_model().encode, [query])
     query_emb = query_emb[0].tolist()
     res = index.query(vector=query_emb, top_k=candidate_k, include_metadata=True)
     candidates = res['matches']
@@ -224,7 +235,7 @@ async def query_index(query, top_k=3, return_metadata=False):
     # Step B: Cross-Encoder scoring
     print(f"[pinecone_service] Step 2: Re-ranking with cross-encoder...")
     pairs = [(query, c['metadata']['text']) for c in candidates]
-    scores = await run_in_threadpool(cross_encoder.predict, pairs)
+    scores = await run_in_threadpool(get_cross_encoder().predict, pairs)
     print(f"[pinecone_service] ✅ Re-ranked {len(scores)} candidates")
 
     # Step C: Sort by Cross-Encoder score (descending)
