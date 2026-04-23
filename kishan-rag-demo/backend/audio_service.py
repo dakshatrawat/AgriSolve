@@ -12,8 +12,7 @@
 import os
 import sys
 import subprocess
-import torch
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
+# NOTE: torch and transformers are imported lazily in get_model() to avoid OOM on Render
 from fastapi import UploadFile
 import tempfile
 import numpy as np
@@ -29,7 +28,7 @@ except ImportError:
     _resampy_available = False
     print("[audio_service] WARNING: resampy not installed - audio resampling may fail")
     print("[audio_service] Install: pip install resampy")
-    
+
 # Use Whisper Small for multilingual support (Hindi, English, Marathi)
 MODEL_NAME = "openai/whisper-small"
 MODELS_DIR = "./models"
@@ -42,7 +41,7 @@ else:
     print(f"[audio_service] Local Whisper model not found, will download: {MODEL_NAME}")
     print(f"[audio_service] Run 'python download_models.py' to download models locally")
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = None  # Set lazily when torch is first imported
 
 # Lazy loading with thread-safety
 _processor = None
@@ -85,13 +84,17 @@ def get_model():
     Lazy load Whisper model on first call (thread-safe).
     Prevents re-loading on concurrent requests.
     """
-    global _processor, _model
-    
+    global _processor, _model, device
+
     # Double-checked locking pattern
     if _processor is None or _model is None:
         with _model_lock:
             # Check again inside lock
             if _processor is None or _model is None:
+                import torch
+                from transformers import WhisperProcessor, WhisperForConditionalGeneration
+                if device is None:
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
                 model_path = LOCAL_MODEL_PATH if USE_LOCAL_MODEL else MODEL_NAME
                 print(f"[audio_service] Loading Whisper model from: {model_path} on {device}...")
                 _processor = WhisperProcessor.from_pretrained(model_path)
@@ -352,6 +355,7 @@ async def transcribe_audio(audio_file: UploadFile, language: str = None) -> dict
         
         # === 7. GENERATE TRANSCRIPTION ===
         print(f"[audio_service] Generating transcription...")
+        import torch
         with torch.no_grad():
             predicted_ids = model.generate(input_features, **generation_kwargs)
         

@@ -65,8 +65,7 @@ elif flags.USE_CHROMADB:
             raise Exception("ChromaDB is not available. Please install chromadb: pip install chromadb")
 from audio_service import transcribe_audio
 import google.generativeai as genai
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+# NOTE: torch and transformers are imported lazily in get_local_llm() to avoid OOM on Render
 
 app = FastAPI()
 
@@ -102,6 +101,8 @@ def get_local_llm():
     """Lazy load local LLM for fallback when API quota exceeded"""
     global _local_tokenizer, _local_model
     if _local_tokenizer is None or _local_model is None:
+        from transformers import AutoTokenizer, AutoModelForCausalLM
+        import torch
         model_path = LOCAL_LLM_PATH if USE_LOCAL_LLM else LOCAL_MODEL_NAME
         print(f"[main] Loading local LLM from: {model_path}...")
         _local_tokenizer = AutoTokenizer.from_pretrained(model_path)
