@@ -1,24 +1,18 @@
 # ============================================================================
-# PINECONE SERVICE - CLOUD VECTOR DATABASE
+# PINECONE SERVICE - CLOUD VECTOR DATABASE (Lightweight - No torch)
 # ============================================================================
-# KEY PIPELINE POINTS (README Reference):
-# [POINT 4] METADATA STORAGE - Stores doc_name, doc_url, source, source_type
-# [POINT 7] VECTOR SEARCH - Uses cosine similarity via Pinecone query
-# [POINT 8] TOP 15 CANDIDATES - Retrieves top_k * 3 candidates for reranking
-# [POINT 9] CROSS-ENCODER RERANKING - ms-marco-MiniLM-L-6-v2 reranks results
-# ============================================================================
-# MODELS USED:
-# - Embedding: all-MiniLM-L6-v2 (384 dimensions)
-# - Reranking: cross-encoder/ms-marco-MiniLM-L-6-v2
+# Uses fastembed (ONNX) for embeddings instead of sentence-transformers (torch)
+# Uses Gemini for reranking instead of local cross-encoder
+# Embedding: all-MiniLM-L6-v2 (384 dimensions) - matches existing index
 # ============================================================================
 
 import os
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
-from sentence_transformers import SentenceTransformer, CrossEncoder
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import asyncio
 from fastapi.concurrency import run_in_threadpool
+import google.generativeai as genai
 
 load_dotenv()
 
@@ -28,6 +22,10 @@ PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
 PINECONE_DIMENSION = int(os.getenv("PINECONE_DIMENSION", "384"))
 PINECONE_METRIC = os.getenv("PINECONE_METRIC", "cosine")
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
 
 # Validate environment variables
 if not PINECONE_API_KEY:
@@ -43,9 +41,6 @@ print(f"[pinecone_service] Environment: {PINECONE_ENVIRONMENT}")
 print(f"[pinecone_service] Index Name: {PINECONE_INDEX_NAME}")
 
 # Parse environment for cloud/region
-# Supports both formats:
-# 1) aws-us-east-1  -> cloud=aws, region=us-east-1
-# 2) us-east-1      -> cloud from PINECONE_CLOUD (default aws), region=us-east-1
 env_value = (PINECONE_ENVIRONMENT or "").strip()
 if env_value.startswith("aws-"):
     cloud, region = "aws", env_value[len("aws-"):]
@@ -67,36 +62,36 @@ except Exception as e:
     print(f"[pinecone_service] ERROR: Failed to initialize Pinecone client: {e}")
     raise
 
-
-# Embedding model: must match Pinecone index dimension
-EMBED_MODEL_NAME = os.getenv("PINECONE_EMBED_MODEL", "all-MiniLM-L6-v2")
+# Embedding model config
+EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 INDEX_DIM = PINECONE_DIMENSION
 
-# Lazy-loaded models (loaded on first request to avoid OOM at startup)
+# Lazy-loaded embedding model (fastembed uses ONNX, much lighter than torch)
 _embed_model = None
-_cross_encoder = None
 
 def get_embed_model():
     global _embed_model
     if _embed_model is None:
-        print(f"[pinecone_service] Loading embedding model: {EMBED_MODEL_NAME}...")
-        _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
-        model_dim = _embed_model.get_sentence_embedding_dimension()
-        print(f"[pinecone_service] Embedding model loaded, dim={model_dim}")
-        if model_dim != INDEX_DIM:
-            raise ValueError(
-                f"Embedding dimension mismatch: model dim={model_dim}, PINECONE_DIMENSION={INDEX_DIM}. "
-                f"Update PINECONE_EMBED_MODEL or PINECONE_DIMENSION to match."
-            )
+        from fastembed import TextEmbedding
+        print(f"[pinecone_service] Loading embedding model (ONNX): {EMBED_MODEL_NAME}...")
+        _embed_model = TextEmbedding(EMBED_MODEL_NAME)
+        print(f"[pinecone_service] Embedding model loaded")
     return _embed_model
 
-def get_cross_encoder():
-    global _cross_encoder
-    if _cross_encoder is None:
-        print(f"[pinecone_service] Loading cross-encoder model...")
-        _cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
-        print(f"[pinecone_service] Cross-encoder loaded")
-    return _cross_encoder
+
+def _embed_texts(texts):
+    """Generate embeddings using fastembed (ONNX runtime)."""
+    model = get_embed_model()
+    embeddings = list(model.embed(texts))
+    return [emb.tolist() for emb in embeddings]
+
+
+def _embed_query(query):
+    """Generate query embedding."""
+    model = get_embed_model()
+    embeddings = list(model.embed([query]))
+    return embeddings[0].tolist()
+
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=500,
@@ -109,9 +104,9 @@ def get_or_create_index():
         print(f"[pinecone_service] Listing existing indexes...")
         index_names = pc.list_indexes().names()
         print(f"[pinecone_service] Found {len(index_names)} existing indexes: {index_names}")
-        
+
         if PINECONE_INDEX_NAME not in index_names:
-            print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' not found. Creating new index with dimension {INDEX_DIM}...")
+            print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' not found. Creating with dim={INDEX_DIM}...")
             pc.create_index(
                 name=PINECONE_INDEX_NAME,
                 dimension=INDEX_DIM,
@@ -121,7 +116,7 @@ def get_or_create_index():
             print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' created successfully")
         else:
             print(f"[pinecone_service] Index '{PINECONE_INDEX_NAME}' already exists")
-        
+
         index = pc.Index(PINECONE_INDEX_NAME)
         print(f"[pinecone_service] Connected to index '{PINECONE_INDEX_NAME}'")
         return index
@@ -140,124 +135,98 @@ except Exception as e:
     raise
 
 
-# ============================================================================
-# [POINT 4] METADATA PRESERVATION IN VECTOR DATABASE
-# Stores all metadata fields: doc_name, doc_url, source, source_type, page_url
-# [POINT 2] CHUNKING - RecursiveCharacterTextSplitter (500 chars, 50 overlap)
-# ============================================================================
 async def upsert_document(text, metadata=None, batch_size=50, chunk_offset=0):
-    """
-    Upsert document chunks with embeddings and metadata to Pinecone.
-    Preserves ALL metadata fields from the input.
-    """
+    """Upsert document chunks with embeddings and metadata to Pinecone."""
     print(f"\n[pinecone_service] === STARTING UPSERT ===")
     print(f"[pinecone_service] Text length: {len(text)} characters")
     print(f"[pinecone_service] Metadata received: {metadata}")
-    
+
     chunks = text_splitter.split_text(text)
     total_chunks = len(chunks)
-    print(f"[pinecone_service] Split into {total_chunks} chunks (chunk_size=500, overlap=50)")
-    
+    print(f"[pinecone_service] Split into {total_chunks} chunks")
+
     total_upserted = 0
     for batch_start in range(0, total_chunks, batch_size):
         batch_chunks = chunks[batch_start:batch_start+batch_size]
         batch_num = (batch_start // batch_size) + 1
-        print(f"[pinecone_service] Processing batch {batch_num}/{(total_chunks + batch_size - 1) // batch_size}: chunks {batch_start}-{batch_start + len(batch_chunks) - 1}")
-        
-        embeddings = await run_in_threadpool(get_embed_model().encode, batch_chunks)
-        embeddings = embeddings.tolist()
-        
+
+        embeddings = await run_in_threadpool(_embed_texts, batch_chunks)
+
         ids = [f"chunk-{chunk_offset + batch_start + i}" for i in range(len(batch_chunks))]
         to_upsert = []
-        
+
         for i, (chunk, emb) in enumerate(zip(batch_chunks, embeddings)):
-            # Start with base metadata
             chunk_metadata = {
                 "text": chunk,
                 "chunk_index": chunk_offset + batch_start + i
             }
-            
-            # Preserve ALL metadata fields from input
             if metadata:
                 for key, value in metadata.items():
-                    # Convert non-string values to strings for Pinecone compatibility
                     if value is not None:
                         chunk_metadata[key] = str(value) if not isinstance(value, str) else value
-            
+
             to_upsert.append((ids[i], emb, chunk_metadata))
-        
-        # Upsert to Pinecone
-        print(f"[pinecone_service] Upserting batch {batch_num} with {len(to_upsert)} vectors to Pinecone...")
+
         index.upsert(vectors=to_upsert)
         total_upserted += len(to_upsert)
-        print(f"[pinecone_service] ✅ Batch {batch_num} upserted successfully")
-    
-    print(f"[pinecone_service] === UPSERT COMPLETE ===")
-    print(f"[pinecone_service] Total chunks upserted to Pinecone: {total_upserted}")
-    print(f"[pinecone_service] Metadata stored with each chunk: {list(chunk_metadata.keys())}")
-    
+        print(f"[pinecone_service] Batch {batch_num} upserted: {len(to_upsert)} vectors")
+
+    print(f"[pinecone_service] === UPSERT COMPLETE: {total_upserted} chunks ===")
     return total_chunks
 
 
-# ============================================================================
-# [POINT 7] HYBRID SEARCH - SEMANTIC + EMBEDDING
-# [POINT 8] TOP 15 CANDIDATES RETRIEVAL (top_k * 3 = 15 for top_k=5)
-# [POINT 9] CROSS-ENCODER RERANKING FOR BEST SIMILARITY
-# ============================================================================
-# SEARCH PROCESS:
-# Step A: Generate query embedding using all-MiniLM-L6-v2
-# Step B: Retrieve 15 candidates via cosine similarity (Pinecone query)
-# Step C: Rerank using cross-encoder/ms-marco-MiniLM-L-6-v2
-# Step D: Return top_k best matches based on reranked scores
-# ============================================================================
 async def query_index(query, top_k=3, return_metadata=False):
-    """
-    Query the Pinecone index with bi-encoder retrieval and cross-encoder reranking.
-    """
+    """Query Pinecone with ONNX embeddings and Gemini reranking."""
     print(f"\n[pinecone_service] === STARTING QUERY ===")
     print(f"[pinecone_service] Query: '{query}'")
-    print(f"[pinecone_service] Requesting top_k={top_k} results")
-    
-    # Step A: Retrieve a larger candidate pool
+
+    # Step 1: Retrieve candidates
     candidate_k = top_k * 3
-    print(f"[pinecone_service] Step 1: Retrieving {candidate_k} candidates from Pinecone...")
-    
-    query_emb = await run_in_threadpool(get_embed_model().encode, [query])
-    query_emb = query_emb[0].tolist()
+    query_emb = await run_in_threadpool(_embed_query, query)
     res = index.query(vector=query_emb, top_k=candidate_k, include_metadata=True)
     candidates = res['matches']
-    print(f"[pinecone_service] ✅ Retrieved {len(candidates)} candidates")
-    
+    print(f"[pinecone_service] Retrieved {len(candidates)} candidates")
+
     if not candidates:
-        print(f"[pinecone_service] ⚠️ No candidates found in Pinecone")
-        return [] if not return_metadata else []
+        return []
 
-    # Step B: Cross-Encoder scoring
-    print(f"[pinecone_service] Step 2: Re-ranking with cross-encoder...")
-    pairs = [(query, c['metadata']['text']) for c in candidates]
-    scores = await run_in_threadpool(get_cross_encoder().predict, pairs)
-    print(f"[pinecone_service] ✅ Re-ranked {len(scores)} candidates")
+    # Step 2: Rerank using Gemini
+    if len(candidates) > top_k and GOOGLE_API_KEY:
+        try:
+            texts = [c['metadata']['text'] for c in candidates]
+            rerank_prompt = (
+                f"Given the query: \"{query}\"\n\n"
+                f"Rank these text passages by relevance (most relevant first). "
+                f"Return ONLY a comma-separated list of numbers (0-indexed positions). "
+                f"Example: 2,0,5,1,3,4\n\n"
+            )
+            for i, t in enumerate(texts):
+                rerank_prompt += f"[{i}] {t[:200]}\n"
 
-    # Step C: Sort by Cross-Encoder score (descending)
-    candidates_with_scores = [
-        (c, s) for c, s in zip(candidates, scores)
-    ]
-    candidates_with_scores.sort(key=lambda x: x[1], reverse=True)
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content(rerank_prompt)
+            ranking_text = response.text.strip()
 
-    # Step D: Select top_k
-    top_matches = [c for c, _ in candidates_with_scores[:top_k]]
-    
-    print(f"[pinecone_service] === QUERY COMPLETE ===")
-    print(f"[pinecone_service] Returning top {len(top_matches)} results")
-    
-    # Log metadata of top results
-    for idx, match in enumerate(top_matches, 1):
-        metadata = match.get('metadata', {})
-        print(f"[pinecone_service] Result {idx}: score={match.get('score', 'N/A'):.4f}, "
-              f"source={metadata.get('source', 'N/A')}, "
-              f"source_type={metadata.get('source_type', 'N/A')}, "
-              f"text_preview={metadata.get('text', '')[:80]}...")
+            ranked_indices = []
+            for part in ranking_text.split(","):
+                part = part.strip()
+                if part.isdigit() and int(part) < len(candidates):
+                    ranked_indices.append(int(part))
+
+            if ranked_indices:
+                reranked = [candidates[i] for i in ranked_indices[:top_k]]
+                candidates = reranked
+                print(f"[pinecone_service] Reranked with Gemini, returning top {len(candidates)}")
+            else:
+                candidates = candidates[:top_k]
+        except Exception as e:
+            print(f"[pinecone_service] Reranking failed: {e}, using Pinecone scores")
+            candidates = candidates[:top_k]
+    else:
+        candidates = candidates[:top_k]
+
+    print(f"[pinecone_service] === QUERY COMPLETE: {len(candidates)} results ===")
 
     if return_metadata:
-        return top_matches
-    return [match['metadata']['text'] for match in top_matches]
+        return candidates
+    return [match['metadata']['text'] for match in candidates]
