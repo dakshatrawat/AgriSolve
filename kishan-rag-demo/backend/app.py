@@ -86,8 +86,13 @@ app = FastAPI()
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
-    "http://localhost:3002"
+    "http://localhost:3002",
 ]
+
+# Add production frontend URL from env var (set on Render)
+_frontend_url = os.getenv("FRONTEND_URL")
+if _frontend_url:
+    origins.append(_frontend_url)
 
 app.add_middleware(
     CORSMiddleware,

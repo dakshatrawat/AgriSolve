@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { getOrCreateTempSessionId } from "@/lib/tempSession";
 import ThemeToggle from "@/lib/ThemeToggle";
+import { API_URL } from "@/lib/api";
 
 type Source = {
   text: string;
@@ -122,7 +123,7 @@ export default function NewUIChat() {
       const formData = new FormData();
       formData.append("audio", file);
       formData.append("language", selectedLanguage);
-      const res = await fetch("http://localhost:8000/api/transcribe", { method: "POST", body: formData });
+      const res = await fetch(`${API_URL}/api/transcribe`, { method: "POST", body: formData });
       if (!res.ok) throw new Error("Transcription failed");
       const data = await res.json();
       if (data.success && data.text) setInput(data.text);
@@ -152,7 +153,7 @@ export default function NewUIChat() {
     const history = messages.slice(-6);
 
     try {
-      const res = await fetch("http://localhost:8000/api/chat", {
+      const res = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-temp-session-id": tempSessionId },
         body: JSON.stringify({ question, history, language: selectedLanguage }),
