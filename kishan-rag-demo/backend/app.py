@@ -12,12 +12,15 @@ import shutil
 from pathlib import Path
 import time
 
-# Import feature flags from root directory
-_backend_dir = os.path.dirname(os.path.abspath(__file__))
-_project_root = os.path.dirname(_backend_dir)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
-import flags
+# Import feature flags (local copy or parent directory)
+try:
+    import flags
+except ImportError:
+    _backend_dir = os.path.dirname(os.path.abspath(__file__))
+    _project_root = os.path.dirname(_backend_dir)
+    if _project_root not in sys.path:
+        sys.path.insert(0, _project_root)
+    import flags
 
 # ============================================================================
 # VECTOR DATABASE INITIALIZATION (Based on flags)
